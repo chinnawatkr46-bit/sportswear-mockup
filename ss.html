@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบจำลองและเลือกฟอนต์ตามภาพ - พลังแห่งความเมตตา</title>
+
+  <!-- โหลดชุดฟอนต์ภาษาไทยตามภาพครบทุกสไตล์จาก Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Charmonman:wght@400;700&family=Chonburi&family=Kanit:wght@300;400;600&family=Mitr:wght@400;500&family=Niramit:ital,wght@0,400;0,600;0,700;1,600&family=Pridi:wght@400;600&family=Prompt:wght@300;400;500;600&family=Sarabun:wght@400;600&family=Trirong:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Prompt', sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+    }
+
+    .main-container {
+      width: 100%;
+      max-width: 1160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .header-area {
+      text-align: center;
+    }
+    .header-area h1 {
+      font-size: 24px;
+      color: #38bdf8;
+      font-weight: 600;
+    }
+    .header-area p {
+      font-size: 14px;
+      color: #94a3b8;
+    }
+
+    /* กล่องหลักแบบ 2 ฝั่ง */
+    .app-card {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      gap: 28px;
+      background: #1e293b;
+      padding: 26px;
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+      width: 100%;
+    }
+
+    @media (max-width: 920px) {
+      .app-card {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ฝั่ง Canvas พรีวิว */
+    .preview-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 460px;
+      aspect-ratio: 1 / 1;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #475569;
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+      /* ลายตารางหมากรุกแบบภาพโปร่งใส */
+      background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%), 
+                        linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #e2e8f0 75%), 
+                        linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+      background-color: #f8fafc;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* ฝั่งควบคุมการเลือกฟอนต์ */
+    .controls-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .control-card {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+    .control-card h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #38bdf8;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .row-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 10px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    .row-grid:last-child {
+      margin-bottom: 0;
+    }
+
+    label {
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    input[type="text"], select {
+      font-family: inherit;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      outline: none;
+      width: 100%;
+    }
+    input[type="text"]:focus, select:focus {
+      border-color: #38bdf8;
+    }
+
+    .options-toggle {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+    .options-toggle label {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-action-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 12px 18px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+      flex: 1;
+    }
+    .btn-primary {
+      background: #0284c7;
+      color: white;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+    }
+    .btn-primary:hover {
+      background: #0369a1;
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: #334155;
+      color: white;
+    }
+    .btn-secondary:hover {
+      background: #475569;
+    }
+
+    /* Modal พรีวิวก่อนบันทึก */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.82);
+      backdrop-filter: blur(5px);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-card {
+      background: #1e293b;
+      border-radius: 20px;
+      padding: 22px;
+      max-width: 480px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .modal-card img {
+      width: 100%;
+      max-width: 360px;
+      aspect-ratio: 1/1;
+      border-radius: 12px;
+      object-fit: contain;
+      border: 1px solid #475569;
+      /* ตารางหมากรุกสำหรับภาพตัวอย่าง */
+      background: repeating-conic-gradient(#cbd5e1 0% 25%, #f1f5f9 0% 50%) 50% / 16px 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="main-container">
+    <div class="header-area">
+      <h1>สร้าง Typography ตามภาพ "พลังแห่งความเมตตา"</h1>
+      <p>ถอดรหัสฟอนต์ครบทุกบรรทัด ปรับแต่งได้อิสระ พร้อมเอฟเฟกต์ 3D Bevel นูนเงา</p>
+    </div>
+
+    <div class="app-card">
+      
+      <!-- คอลัมน์ซ้าย: หน้าจอ Canvas -->
+      <div class="preview-col">
+        <div class="canvas-wrapper" id="canvasFrame">
+          <canvas id="stageCanvas" width="832" height="832"></canvas>
+        </div>
+        <div style="font-size: 13px; color: #94a3b8;">
+          💡 ตัวอย่างภาพความละเอียด 832 × 832 px
+        </div>
+      </div>
+
+      <!-- คอลัมน์ขวา: ปรับแต่งฟอนต์ทีละบรรทัด -->
+      <div class="controls-col">
+        
+        <!-- หมวด: เลือกฟอนต์ทีละบรรทัด -->
+        <div class="control-card">
+          <h3>
+            <span>🔤 เลือกฟอนต์แยกบรรทัด (ตามภาพ)</span>
+            <button class="btn btn-secondary" id="btnResetPreset" style="padding: 4px 10px; font-size: 12px; flex: unset;">
+              🔄 รีเซ็ตตามภาพเป๊ะๆ
+            </button>
+          </h3>
+
+          <!-- บรรทัดที่ 1: พลัง -->
+          <div class="row-grid">
+            <label>1. "พลัง" (Serif หรูหรา):</label>
+            <select id="font1Select">
+              <option value="Niramit" selected>Niramit (นิรมิต - แนะนำ ตรงกับภาพ)</option>
+              <option value="Pridi">Pridi (ปรีดี - มีเชิง คอนทราสต์สูง)</option>
+              <option value="Trirong">Trirong (ไตรรงค์ - คลาสสิก)</option>
+              <option value="Charmonman">Charmonman (มีสวอชปลายหาง)</option>
+            </select>
+          </div>
+
+          <!-- บรรทัดที่ 2: แห่ง -->
+          <div class="row-grid">
+            <label>2. "แห่ง" (โมเดิร์น ไร้หัว):</label>
+            <select id="font2Select">
+              <option value="Prompt" selected>Prompt (พร้อมท์ - แนะนำ ตรงกับภาพ)</option>
+              <option value="Kanit">Kanit (คณิต - คมชัด หนักแน่น)</option>
+              <option value="Mitr">Mitr (มิตร - สะอาดตา)</option>
+            </select>
+          </div>
+
+          <!-- บรรทัดที่ 3: ความเมตตา -->
+          <div class="row-grid">
+            <label>3. "ความเมตตา" (Bodoni/Didone):</label>
+            <select id="font3Select">
+              <option value="Chonburi" selected>Chonburi (ชลบุรี - แนะนำ เชิงคมเหมือนภาพ 100%)</option>
+              <option value="Niramit">Niramit (นิรมิต หนา)</option>
+              <option value="Pridi">Pridi (ปรีดี)</option>
+            </select>
+          </div>
+
+          <!-- บรรทัดที่ 4: ชุบชีวิต เปลี่ยนชุมชน -->
+          <div class="row-grid">
+            <label>4. "ชุบชีวิต..." (ไร้หัว โค้งมน):</label>
+            <select id="font4Select">
+              <option value="Prompt" selected>Prompt (พร้อมท์ - แนะนำ)</option>
+              <option value="Kanit">Kanit (คณิต)</option>
+              <option value="Mitr">Mitr (มิตร)</option>
+              <option value="Sarabun">Sarabun (สารบัญ)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- หมวด: แก้ไขข้อความ -->
+        <div class="control-card">
+          <h3>✏️ แก้ไขข้อความ</h3>
+          <div class="row-grid">
+            <label>ข้อความ 1:</label>
+            <input type="text" id="text1Input" value="พลัง">
+          </div>
+          <div class="row-grid">
+            <label>ข้อความ 2:</label>
+            <input type="text" id="text2Input" value="แห่ง">
+          </div>
+          <div class="row-grid">
+            <label>ข้อความ 3:</label>
+            <input type="text" id="text3Input" value="ความเมตตา">
+          </div>
+          <div class="row-grid">
+            <label>ข้อความ 4:</label>
+            <input type="text" id="text4Input" value="ชุบชีวิต เปลี่ยนชุมชน">
+          </div>
+        </div>
+
+        <!-- หมวด: มิติ & พื้นหลัง -->
+        <div class="control-card">
+          <h3>✨ สไตล์มิติ & พื้นหลัง</h3>
+          <div class="options-toggle">
+            <label>
+              <input type="checkbox" id="bevelEffect" checked>
+              <b>เอฟเฟกต์ 3D Bevel (นูนเงาตามภาพ)</b>
+            </label>
+            <label>
+              <input type="checkbox" id="showSwash" checked>
+              หางสวอชบนไม้หันอากาศ
+            </label>
+            <label>
+              <input type="checkbox" id="bgBlue">
+              พื้นหลังสีน้ำเงิน (ค่าเริ่มต้น: โปร่งใส)
+            </label>
+            <label>
+              <input type="checkbox" id="hd2x" checked>
+              โหมดความคมชัดสูง 2x HD (1664px)
+            </label>
+          </div>
+        </div>
+
+        <!-- ปุ่มดาวน์โหลด -->
+        <div class="btn-action-group">
+          <button class="btn btn-secondary" id="btnOpenModal">
+            🔍 ดูตัวอย่างภาพ (Preview)
+          </button>
+          <button class="btn btn-primary" id="btnDownload">
+            📥 ดาวน์โหลด PNG ทันที
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal ดูตัวอย่างก่อนบันทึก -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-card">
+      <h3 style="color: #38bdf8;">ภาพตัวอย่างที่จะถูกส่งออก (PNG)</h3>
+      <img id="modalPreviewImage" src="" alt="Preview">
+      <div id="modalDetails" style="font-size: 13px; color: #94a3b8;"></div>
+      <div class="btn-action-group" style="width: 100%;">
+        <button class="btn btn-primary" id="btnConfirmDownload">บันทึกรูปภาพ (Save)</button>
+        <button class="btn btn-secondary" id="btnCloseModal">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('stageCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Controls
+    const font1Select = document.getElementById('font1Select');
+    const font2Select = document.getElementById('font2Select');
+    const font3Select = document.getElementById('font3Select');
+    const font4Select = document.getElementById('font4Select');
+
+    const text1Input = document.getElementById('text1Input');
+    const text2Input = document.getElementById('text2Input');
+    const text3Input = document.getElementById('text3Input');
+    const text4Input = document.getElementById('text4Input');
+
+    const bevelEffect = document.getElementById('bevelEffect');
+    const showSwash = document.getElementById('showSwash');
+    const bgBlue = document.getElementById('bgBlue');
+    const hd2x = document.getElementById('hd2x');
+    const btnResetPreset = document.getElementById('btnResetPreset');
+
+    // Modal
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalPreviewImage = document.getElementById('modalPreviewImage');
+    const modalDetails = document.getElementById('modalDetails');
+    const btnOpenModal = document.getElementById('btnOpenModal');
+    const btnCloseModal = document.getElementById('btnCloseModal');
+    const btnConfirmDownload = document.getElementById('btnConfirmDownload');
+    const btnDownload = document.getElementById('btnDownload');
+
+    // SVG Swash Path บนไม้หันอากาศของคำว่า "พลัง"
+    const swashPath = new Path2D("M 10 35 C 15 15, 35 8, 60 10 C 85 12, 105 32, 115 28 C 110 38, 80 40, 60 30 C 40 20, 20 28, 10 35 Z");
+
+    // ฟังก์ชันเรนเดอร์ Canvas
+    async function renderGraphic(targetCanvas = canvas, scale = 1) {
+      const size = 832 * scale;
+      targetCanvas.width = size;
+      targetCanvas.height = size;
+      const c = targetCanvas.getContext('2d');
+      c.clearRect(0, 0, size, size);
+
+      // 1. พื้นหลัง
+      if (bgBlue.checked) {
+        const grad = c.createRadialGradient(size * 0.5, size * 0.48, size * 0.05, size * 0.5, size * 0.5, size * 0.72);
+        grad.addColorStop(0, '#046ec9');
+        grad.addColorStop(0.55, '#0263c1');
+        grad.addColorStop(1, '#0054ab');
+        c.fillStyle = grad;
+        c.fillRect(0, 0, size, size);
+      }
+
+      await document.fonts.ready;
+
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+
+      const is3D = bevelEffect.checked;
+
+      // ฟังก์ชันช่วยวาดข้อความพร้อมเอฟเฟกต์นูนเงา 3D Bevel & Emboss
+      function drawStyledText(text, x, y, fontCss, isLarge = false) {
+        c.font = fontCss;
+
+        if (is3D) {
+          // เงาตกกระทบด้านล่างขวา (Shadow)
+          c.shadowColor = 'rgba(0, 0, 0, 0.4)';
+          c.shadowBlur = (isLarge ? 8 : 4) * scale;
+          c.shadowOffsetX = (isLarge ? 3.5 : 1.8) * scale;
+          c.shadowOffsetY = (isLarge ? 4 : 2.2) * scale;
+          c.fillStyle = '#ffffff';
+          c.fillText(text, x, y);
+
+          // ไฮไลต์แสงตกกระทบขอบบนซ้าย (Top-Left Highlight)
+          c.shadowColor = 'rgba(255, 255, 255, 0.85)';
+          c.shadowBlur = 2 * scale;
+          c.shadowOffsetX = -1.2 * scale;
+          c.shadowOffsetY = -1.2 * scale;
+          c.fillText(text, x, y);
+
+          // เคลียร์ค่าเงาและตัดเส้นขอบบางๆ สไตล์โลหะนูน
+          c.shadowColor = 'transparent';
+          c.strokeStyle = 'rgba(150, 160, 180, 0.45)';
+          c.lineWidth = (isLarge ? 1.4 : 0.8) * scale;
+          c.strokeText(text, x, y);
+        } else {
+          c.shadowColor = 'transparent';
+          c.fillStyle = '#ffffff';
+          c.fillText(text, x, y);
+        }
+      }
+
+      // บรรทัดที่ 1: "พลัง" (ขนาดใหญ่สุด ~185px)
+      const font1 = font1Select.value;
+      drawStyledText(text1Input.value, size * 0.5, 335 * scale, `600 ${185 * scale}px "${font1}", serif`, true);
+
+      // หางสวอชบนไม้หันอากาศ (ถ้าเปิดใช้งาน)
+      if (showSwash.checked && text1Input.value.includes('ลั')) {
+        c.save();
+        c.translate(size * 0.5 + (12 * scale), 168 * scale);
+        c.scale(0.9 * scale, 0.9 * scale);
+        if (is3D) {
+          c.shadowColor = 'rgba(0, 0, 0, 0.35)';
+          c.shadowBlur = 4 * scale;
+          c.shadowOffsetX = 2 * scale;
+          c.shadowOffsetY = 2 * scale;
+        }
+        c.fillStyle = '#ffffff';
+        c.fill(swashPath);
+        c.restore();
+      }
+
+      // บรรทัดที่ 2: "— แห่ง —"
+      const font2 = font2Select.value;
+      const text2 = text2Input.value;
+      const line2Y = 485 * scale;
+      drawStyledText(text2, size * 0.5, line2Y, `400 ${36 * scale}px "${font2}", sans-serif`, false);
+
+      // เส้นขีดซ้าย-ขวาของ "แห่ง"
+      if (text2.trim() !== '') {
+        const m = c.measureText(text2);
+        const halfW = m.width / 2;
+        const lineLen = 90 * scale;
+        const gap = 18 * scale;
+
+        c.strokeStyle = is3D ? 'rgba(180, 190, 205, 0.7)' : '#ffffff';
+        c.lineWidth = 2 * scale;
+        c.beginPath();
+        // เส้นซ้าย
+        c.moveTo(size * 0.5 - halfW - gap - lineLen, line2Y);
+        c.lineTo(size * 0.5 - halfW - gap, line2Y);
+        // เส้นขวา
+        c.moveTo(size * 0.5 + halfW + gap, line2Y);
+        c.lineTo(size * 0.5 + halfW + gap + lineLen, line2Y);
+        c.stroke();
+      }
+
+      // บรรทัดที่ 3: "ความเมตตา" (Bodoni/Chonburi ~135px)
+      const font3 = font3Select.value;
+      let size3 = 132 * scale;
+      if (font3 === 'Chonburi') size3 = 125 * scale;
+      drawStyledText(text3Input.value, size * 0.5, 605 * scale, `700 ${size3}px "${font3}", serif`, true);
+
+      // บรรทัดที่ 4: "ชุบชีวิต เปลี่ยนชุมชน"
+      const font4 = font4Select.value;
+      drawStyledText(text4Input.value, size * 0.5, 735 * scale, `400 ${38 * scale}px "${font4}", sans-serif`, false);
+    }
+
+    // อัปเดตเมื่อค่าเปลี่ยน
+    [font1Select, font2Select, font3Select, font4Select, bevelEffect, showSwash, bgBlue].forEach(el => {
+      el.addEventListener('change', () => renderGraphic());
+    });
+    [text1Input, text2Input, text3Input, text4Input].forEach(el => {
+      el.addEventListener('input', () => renderGraphic());
+    });
+
+    // ปุ่มรีเซ็ตค่ากลับเป็นค่าตั้งต้นตามภาพ
+    btnResetPreset.addEventListener('click', () => {
+      font1Select.value = 'Niramit';
+      font2Select.value = 'Prompt';
+      font3Select.value = 'Chonburi';
+      font4Select.value = 'Prompt';
+      text1Input.value = 'พลัง';
+      text2Input.value = 'แห่ง';
+      text3Input.value = 'ความเมตตา';
+      text4Input.value = 'ชุบชีวิต เปลี่ยนชุมชน';
+      bevelEffect.checked = true;
+      showSwash.checked = true;
+      renderGraphic();
+    });
+
+    // ฟังก์ชันดาวน์โหลดภาพ
+    async function getExportUrl() {
+      const scale = hd2x.checked ? 2 : 1;
+      const expCanvas = document.createElement('canvas');
+      await renderGraphic(expCanvas, scale);
+      return {
+        url: expCanvas.toDataURL('image/png'),
+        size: 832 * scale
+      };
+    }
+
+    async function triggerSave() {
+      const { url } = await getExportUrl();
+      const a = document.createElement('a');
+      a.download = `palang-typography-${Date.now()}.png`;
+      a.href = url;
+      a.click();
+    }
+
+    btnDownload.addEventListener('click', triggerSave);
+    btnConfirmDownload.addEventListener('click', () => {
+      triggerSave();
+      modalOverlay.classList.remove('show');
+    });
+
+    btnOpenModal.addEventListener('click', async () => {
+      const { url, size } = await getExportUrl();
+      modalPreviewImage.src = url;
+      modalDetails.textContent = `ขนาดรูปภาพ: ${size} × ${size} px (${bgBlue.checked ? 'พื้นหลังสีน้ำเงิน' : 'พื้นหลังโปร่งใส Transparent'})`;
+      modalOverlay.classList.add('show');
+    });
+
+    btnCloseModal.addEventListener('click', () => modalOverlay.classList.remove('show'));
+
+    // เริ่มทำงานครั้งแรก
+    renderGraphic();
+  </script>
+</body>
+</html>

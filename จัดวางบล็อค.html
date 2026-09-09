@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>จัดวางแพทเทิร์น — แจ็คเก็ต 2XL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --mat:#173028;
+    --mat-deep:#0e1e19;
+    --mat-line: rgba(255,255,255,.055);
+    --mat-line-strong: rgba(255,255,255,.10);
+    --maroon:#7c1f2b;
+    --maroon-dim:#5c1620;
+    --maroon-bright:#9e2a38;
+    --gold:#c9a227;
+    --gold-soft:#e6cd6e;
+    --paper:#efe9dd;
+    --paper-dim:#e3dac6;
+    --ink:#20211d;
+    --ink-soft:#6b6c63;
+    --danger:#b3402f;
+    --font-ui:'Space Grotesk', system-ui, sans-serif;
+    --font-mono:'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--mat-deep);
+    font-family:var(--font-ui);
+    color:var(--ink);
+    min-height:100vh;
+  }
+  .app{max-width:1400px;margin:0 auto;padding:18px 18px 40px;}
+
+  /* ---------- Header ---------- */
+  .topbar{
+    display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;
+    gap:14px;margin-bottom:16px;padding-bottom:14px;
+    border-bottom:1px solid rgba(255,255,255,.12);
+  }
+  .topbar h1{
+    color:var(--paper);
+    font-size:22px;font-weight:700;margin:0 0 4px;letter-spacing:.2px;
+  }
+  .topbar .meta{
+    color:var(--gold-soft);font-family:var(--font-mono);font-size:12.5px;
+    display:flex;gap:10px;flex-wrap:wrap;
+  }
+  .topbar .meta span:not(:last-child)::after{content:'·';margin-left:10px;color:rgba(230,205,110,.4);}
+  .hint{
+    color:rgba(239,233,221,.65);font-size:12.5px;max-width:360px;line-height:1.5;
+  }
+  .btn-ghost{
+    background:transparent;border:1px solid rgba(255,255,255,.25);color:var(--paper);
+    padding:8px 14px;border-radius:3px;font-family:var(--font-ui);font-size:13px;
+    cursor:pointer;transition:.15s border-color, .15s background;white-space:nowrap;
+  }
+  .btn-ghost:hover{border-color:var(--gold-soft);background:rgba(255,255,255,.06);}
+
+  /* ---------- Workspace layout ---------- */
+  .workspace{display:flex;gap:18px;align-items:flex-start;}
+  .board-wrap{flex:1;min-width:0;}
+  .board{
+    position:relative;width:100%;aspect-ratio:2432/1512;
+    background-color:var(--mat);
+    background-image:
+      repeating-linear-gradient(0deg, var(--mat-line-strong) 0 1px, transparent 1px 100px),
+      repeating-linear-gradient(90deg, var(--mat-line-strong) 0 1px, transparent 1px 100px),
+      repeating-linear-gradient(0deg, var(--mat-line) 0 1px, transparent 1px 20px),
+      repeating-linear-gradient(90deg, var(--mat-line) 0 1px, transparent 1px 20px);
+    border-radius:6px;
+    box-shadow:0 20px 50px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.06);
+    overflow:hidden;
+    touch-action:none;
+  }
+
+  /* ---------- Pattern piece frames ---------- */
+  .frame{
+    position:absolute;
+    background:linear-gradient(100deg, var(--maroon) 0%, var(--gold) 55%, var(--paper) 100%);
+    overflow:hidden;
+    cursor:pointer;
+    outline:1px dashed rgba(255,255,255,.35);
+    outline-offset:-1px;
+  }
+  .frame.has-image{background:var(--ink);}
+  .frame.selected{
+    outline:2px solid var(--gold-soft);
+    outline-offset:-2px;
+    box-shadow:0 0 0 4px rgba(230,205,110,.18);
+    z-index:5;
+  }
+  .frame .tag{
+    position:absolute;top:6px;left:6px;z-index:3;pointer-events:none;
+    background:rgba(15,20,17,.72);color:var(--paper);
+    font-family:var(--font-mono);font-size:10.5px;letter-spacing:.02em;
+    padding:3px 7px;border-radius:2px;line-height:1.3;
+    max-width:calc(100% - 40px);
+  }
+  .frame .placeholder{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:6px;color:rgba(32,33,29,.75);
+    font-size:12px;text-align:center;padding:10px;pointer-events:none;
+  }
+  .frame .placeholder svg{opacity:.8;}
+  .frame.has-image .placeholder{display:none;}
+  .imgwrap{position:absolute;inset:0;overflow:hidden;}
+  .imgwrap img{
+    position:absolute;top:50%;left:50%;
+    transform-origin:center center;
+    user-select:none;-webkit-user-drag:none;
+    cursor:grab;
+    will-change:transform;
+  }
+  .imgwrap img:active{cursor:grabbing;}
+  .frame .del-btn{
+    position:absolute;top:5px;right:5px;z-index:4;
+    width:22px;height:22px;border-radius:50%;
+    background:var(--danger);color:#fff;border:none;
+    font-size:14px;line-height:1;cursor:pointer;display:none;
+    align-items:center;justify-content:center;
+  }
+  .frame.has-image .del-btn{display:flex;}
+
+  /* shapes */
+  .shape-front{clip-path:polygon(0% 0%,60% 0%,66% 2%,70% 8%,74% 16%,71% 24%,76% 30%,86% 27%,93% 19%,97% 27%,95% 38%,88% 47%,83% 58%,81% 70%,84% 82%,79% 93%,70% 100%,0% 100%);}
+  .shape-back{clip-path:polygon(8% 0%,92% 0%,97% 6%,100% 16%,94% 30%,90% 42%,93% 50%,90% 58%,94% 70%,100% 84%,97% 94%,92% 100%,8% 100%,3% 94%,0% 84%,6% 70%,10% 58%,7% 50%,10% 42%,6% 30%,0% 16%,3% 6%);}
+  .shape-sleeve-left{clip-path:polygon(5% 22%,38% 0%,70% 8%,95% 22%,100% 45%,93% 68%,97% 90%,85% 100%,15% 100%,3% 90%,7% 68%,0% 45%);}
+  .shape-sleeve-right{clip-path:polygon(95% 22%,62% 0%,30% 8%,5% 22%,0% 45%,7% 68%,3% 90%,15% 100%,85% 100%,97% 90%,93% 68%,100% 45%);}
+  .shape-rect{border-radius:2px;}
+  .shape-tag{border-radius:2px;}
+
+  /* ---------- Panel ---------- */
+  .panel{
+    width:300px;flex:0 0 300px;
+    background:var(--paper);border-radius:6px;
+    padding:16px;min-height:200px;
+    box-shadow:0 12px 30px rgba(0,0,0,.35);
+  }
+  .panel-empty{color:var(--ink-soft);font-size:13px;line-height:1.6;padding:20px 4px;}
+  .panel-title{font-weight:700;font-size:15px;margin:0 0 2px;}
+  .panel-sub{font-family:var(--font-mono);font-size:11px;color:var(--ink-soft);margin:0 0 14px;}
+  .panel hr{border:none;border-top:1px solid var(--paper-dim);margin:14px 0;}
+  .field{margin-bottom:14px;}
+  .field label{
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:12px;color:var(--ink-soft);margin-bottom:6px;font-family:var(--font-mono);
+  }
+  .field label b{color:var(--ink);font-weight:600;}
+  input[type=range]{width:100%;accent-color:var(--maroon);}
+  .row2{display:flex;gap:8px;}
+  .btn{
+    flex:1;background:var(--ink);color:var(--paper);border:none;
+    padding:9px 8px;border-radius:3px;font-family:var(--font-ui);font-size:12.5px;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;
+    transition:.15s background;
+  }
+  .btn:hover{background:#3a3b34;}
+  .btn.active{background:var(--maroon);}
+  .btn.primary{background:var(--maroon);}
+  .btn.primary:hover{background:var(--maroon-bright);}
+  .btn.danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
+  .btn.danger:hover{background:rgba(179,64,47,.1);}
+  .btn.upload{width:100%;background:var(--maroon);color:#fff;padding:11px;font-size:13px;}
+  .btn.upload:hover{background:var(--maroon-bright);}
+  .stack{display:flex;flex-direction:column;gap:8px;}
+
+  /* ---------- Crop modal ---------- */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(14,30,25,.78);
+    display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;
+  }
+  .modal-overlay[hidden]{display:none;}
+  .crop-modal{
+    background:var(--paper);border-radius:6px;padding:18px;
+    width:min(560px, 100%);box-shadow:0 24px 60px rgba(0,0,0,.5);
+  }
+  .crop-modal h3{margin:0 0 4px;font-size:15px;}
+  .crop-modal p{margin:0 0 14px;font-size:12px;color:var(--ink-soft);}
+  .crop-stage{
+    position:relative;background:var(--mat-deep);border-radius:4px;
+    display:flex;align-items:center;justify-content:center;
+    min-height:280px;max-height:56vh;overflow:hidden;touch-action:none;
+  }
+  .crop-stage img{max-width:100%;max-height:56vh;display:block;user-select:none;-webkit-user-drag:none;}
+  .crop-rect{
+    position:absolute;border:2px solid var(--gold-soft);
+    box-shadow:0 0 0 2000px rgba(0,0,0,.5);
+    cursor:move;
+  }
+  .crop-handle{
+    position:absolute;width:14px;height:14px;background:var(--gold-soft);
+    border:2px solid var(--ink);border-radius:50%;
+  }
+  .crop-handle[data-h=nw]{top:-8px;left:-8px;cursor:nwse-resize;}
+  .crop-handle[data-h=ne]{top:-8px;right:-8px;cursor:nesw-resize;}
+  .crop-handle[data-h=sw]{bottom:-8px;left:-8px;cursor:nesw-resize;}
+  .crop-handle[data-h=se]{bottom:-8px;right:-8px;cursor:nwse-resize;}
+  .crop-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
+  .crop-actions button{padding:9px 18px;}
+
+  @media (max-width:900px){
+    .workspace{flex-direction:column;}
+    .panel{width:100%;flex:none;}
+    .topbar{align-items:flex-start;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div>
+      <h1>จัดวางแพทเทิร์น</h1>
+      <div class="meta"><span>MEDICAL TECHNOLOGY</span><span>NAKHON PHANOM UNIVERSITY</span><span>แจ็คเก็ต 2XL</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="hint">คลิกชิ้นแพทเทิร์นที่ว่างเพื่ออัปโหลดภาพ ลากภาพเพื่อย้ายตำแหน่ง เลื่อนสกอลล์เพื่อซูม</div>
+      <button class="btn-ghost" id="clearAllBtn" type="button">ล้างภาพทั้งหมด</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <div class="board-wrap">
+      <div class="board" id="board"></div>
+    </div>
+    <aside class="panel" id="panel">
+      <div class="panel-empty" id="panelEmpty">เลือกหรืออัปโหลดภาพลงในชิ้นแพทเทิร์นทางซ้าย เพื่อแก้ไขตำแหน่ง ขนาด และการหมุนที่นี่</div>
+      <div id="panelContent" hidden>
+        <p class="panel-title" id="pTitle">-</p>
+        <p class="panel-sub" id="pSub">-</p>
+
+        <div id="pEmptyState">
+          <button class="btn upload" id="pUploadBtn" type="button">+ อัปโหลดภาพ</button>
+        </div>
+
+        <div id="pHasImage" hidden>
+          <button class="btn-ghost" id="pChangeBtn" type="button" style="width:100%;color:var(--ink);border-color:var(--ink-soft);margin-bottom:14px;">เปลี่ยนภาพ</button>
+
+          <div class="field">
+            <label>ขยาย/ย่อภาพ <b id="scaleVal">100%</b></label>
+            <input type="range" id="scaleRange" min="10" max="500" value="100">
+          </div>
+
+          <div class="field">
+            <label>หมุนอิสระ <b id="rotVal">0°</b></label>
+            <input type="range" id="rotRange" min="-180" max="180" value="0">
+          </div>
+
+          <div class="field row2">
+            <button class="btn" id="rotCcwBtn" type="button">↺ หมุน 90°</button>
+            <button class="btn" id="rotCwBtn" type="button">↻ หมุน 90°</button>
+          </div>
+
+          <div class="field row2">
+            <button class="btn" id="flipHBtn" type="button">⇋ พลิกแนวนอน</button>
+            <button class="btn" id="flipVBtn" type="button">⇵ พลิกแนวตั้ง</button>
+          </div>
+
+          <hr>
+
+          <div class="stack">
+            <button class="btn primary" id="cropBtn" type="button">✂ ครอบตัดภาพ</button>
+            <button class="btn" id="resetBtn" type="button">รีเซ็ตตำแหน่ง/ขนาด</button>
+            <button class="btn danger" id="deleteBtn" type="button">ลบภาพนี้</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept="image/*" hidden>
+
+<div class="modal-overlay" id="cropOverlay" hidden>
+  <div class="crop-modal">
+    <h3>ครอบตัดภาพ</h3>
+    <p>ลากกรอบหรือมุมกรอบเพื่อเลือกส่วนของภาพที่ต้องการเก็บไว้</p>
+    <div class="crop-stage" id="cropStage">
+      <img id="cropImg" alt="">
+      <div class="crop-rect" id="cropRect">
+        <div class="crop-handle" data-h="nw"></div>
+        <div class="crop-handle" data-h="ne"></div>
+        <div class="crop-handle" data-h="sw"></div>
+        <div class="crop-handle" data-h="se"></div>
+      </div>
+    </div>
+    <div class="crop-actions">
+      <button class="btn" id="cropCancelBtn" type="button" style="flex:none;">ยกเลิก</button>
+      <button class="btn primary" id="cropApplyBtn" type="button" style="flex:none;">ครอบตัด</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Block definitions (position/size approximate the reference layout sheet) ----------
+  var BLOCKS = [
+    { id:'front',        label:'ตัวหน้า',                 left:0,    top:0,  width:42,  height:60, shape:'shape-front' },
+    { id:'back',         label:'ตัวหลัง (นอนสลับหัว 2 ชิ้น)', left:42,   top:0,  width:44,  height:60, shape:'shape-back' },
+    { id:'strip-right',  label:'แถบขอบหน้า',              left:86,   top:0,  width:14,  height:60, shape:'shape-rect' },
+    { id:'sleeve-left',  label:'แขนเสื้อซ้าย',            left:0,    top:62, width:42,  height:38, shape:'shape-sleeve-left' },
+    { id:'trim-a',       label:'แถบเก็บขอบ 1',            left:46,   top:68, width:7.3, height:32, shape:'shape-rect' },
+    { id:'trim-b',       label:'แถบเก็บขอบ 2',            left:53.4, top:68, width:7.3, height:32, shape:'shape-rect' },
+    { id:'sleeve-right', label:'แขนเสื้อขวา',             left:61,   top:62, width:39,  height:38, shape:'shape-sleeve-right' },
+    { id:'tag-a',        label:'ป้ายโลโก้ 1',             left:1,    top:91, width:4.2, height:8,  shape:'shape-tag' },
+    { id:'tag-b',        label:'ป้ายโลโก้ 2',             left:5.6,  top:91, width:4.2, height:8,  shape:'shape-tag' }
+  ];
+
+  var state = {};        // per-block image + transform state
+  var selectedId = null;
+  var dragCtx = null;    // active pointer-drag context for moving an image
+  var cropCtx = null;    // active crop-rect edit context
+  var uploadTargetId = null;
+
+  function defaultState(){
+    return { src:null, natW:0, natH:0, x:0, y:0, scale:1, rotation:0, flipH:false, flipV:false };
+  }
+  BLOCKS.forEach(function(b){ state[b.id] = defaultState(); });
+
+  var board = document.getElementById('board');
+
+  // ---------- Build board DOM ----------
+  BLOCKS.forEach(function(b){
+    var frame = document.createElement('div');
+    frame.className = 'frame ' + b.shape;
+    frame.style.left = b.left + '%';
+    frame.style.top = b.top + '%';
+    frame.style.width = b.width + '%';
+    frame.style.height = b.height + '%';
+    frame.dataset.id = b.id;
+
+    var tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.textContent = b.label;
+    frame.appendChild(tag);
+
+    var placeholder = document.createElement('div');
+    placeholder.className = 'placeholder';
+    placeholder.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 16l4.5-5.5a1 1 0 0 1 1.6.05L14 15l2-2.3a1 1 0 0 1 1.55 0L21 16"/><rect x="3" y="4" width="18" height="16" rx="1.5"/><circle cx="8.2" cy="8.2" r="1.6"/></svg><span>คลิกเพื่ออัปโหลดภาพ</span>';
+    frame.appendChild(placeholder);
+
+    var imgwrap = document.createElement('div');
+    imgwrap.className = 'imgwrap';
+    frame.appendChild(imgwrap);
+
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del-btn';
+    del.innerHTML = '&times;';
+    del.addEventListener('click', function(e){
+      e.stopPropagation();
+      deleteImage(b.id);
+    });
+    frame.appendChild(del);
+
+    frame.addEventListener('click', function(){
+      selectBlock(b.id);
+      if(!state[b.id].src){ openUploadFor(b.id); }
+    });
+
+    frame.addEventListener('wheel', function(e){
+      if(!state[b.id].src) return;
+      e.preventDefault();
+      var s = state[b.id];
+      var factor = Math.exp(-e.deltaY * 0.0012);
+      s.scale = clamp(s.scale * factor, 0.1, 6);
+      render(b.id);
+      if(selectedId === b.id) syncPanel();
+    }, { passive:false });
+
+    frame.addEventListener('dragover', function(e){ e.preventDefault(); });
+    frame.addEventListener('drop', function(e){
+      e.preventDefault();
+      var f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if(f) loadFile(b.id, f);
+    });
+
+    board.appendChild(frame);
+  });
+
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+  function normAngle(a){ a = a % 360; if(a > 180) a -= 360; if(a < -180) a += 360; return a; }
+  function getBlock(id){ for(var i=0;i<BLOCKS.length;i++){ if(BLOCKS[i].id===id) return BLOCKS[i]; } return null; }
+  function getFrame(id){ return board.querySelector('.frame[data-id="'+id+'"]'); }
+
+  // ---------- Selecting ----------
+  function selectBlock(id){
+    selectedId = id;
+    Array.prototype.forEach.call(board.querySelectorAll('.frame'), function(f){
+      f.classList.toggle('selected', f.dataset.id === id);
+    });
+    syncPanel();
+  }
+
+  // ---------- Rendering an image's transform ----------
+  function render(id){
+    var s = state[id];
+    var frame = getFrame(id);
+    frame.classList.toggle('has-image', !!s.src);
+    var imgwrap = frame.querySelector('.imgwrap');
+    var img = imgwrap.querySelector('img');
+    if(!s.src){ imgwrap.innerHTML = ''; return; }
+    if(!img){
+      img = document.createElement('img');
+      imgwrap.innerHTML = '';
+      imgwrap.appendChild(img);
+      attachDrag(img, id);
+    }
+    if(img.src !== s.src) img.src = s.src;
+    var sx = s.scale * (s.flipH ? -1 : 1);
+    var sy = s.scale * (s.flipV ? -1 : 1);
+    img.style.transform =
+      'translate(-50%,-50%) translate(' + s.x + 'px,' + s.y + 'px) rotate(' + s.rotation + 'deg) scale(' + sx + ',' + sy + ')';
+  }
+
+  // ---------- Moving an image (pointer drag) ----------
+  function attachDrag(img, id){
+    img.addEventListener('pointerdown', function(e){
+      if(e.button !== undefined && e.button !== 0) return;
+      selectBlock(id);
+      var s = state[id];
+      dragCtx = { id:id, startX:e.clientX, startY:e.clientY, origX:s.x, origY:s.y, moved:false };
+      img.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    img.addEventListener('pointermove', function(e){
+      if(!dragCtx || dragCtx.id !== id) return;
+      var dx = e.clientX - dragCtx.startX;
+      var dy = e.clientY - dragCtx.startY;
+      if(Math.abs(dx) > 2 || Math.abs(dy) > 2) dragCtx.moved = true;
+      var s = state[id];
+      s.x = dragCtx.origX + dx;
+      s.y = dragCtx.origY + dy;
+      render(id);
+    });
+    img.addEventListener('pointerup', function(e){
+      dragCtx = null;
+      try{ img.releasePointerCapture(e.pointerId); }catch(err){}
+    });
+    img.addEventListener('pointercancel', function(){ dragCtx = null; });
+  }
+
+  // ---------- Loading files ----------
+  function openUploadFor(id){
+    uploadTargetId = id;
+    fileInput.value = '';
+    fileInput.click();
+  }
+  var fileInput = document.getElementById('fileInput');
+  fileInput.addEventListener('change', function(){
+    var f = fileInput.files && fileInput.files[0];
+    if(f && uploadTargetId) loadFile(uploadTargetId, f);
+  });
+
+  function loadFile(id, file){
+    if(!/^image\//.test(file.type)) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var probe = new Image();
+      probe.onload = function(){
+        var s = state[id];
+        s.src = reader.result;
+        s.natW = probe.naturalWidth;
+        s.natH = probe.naturalHeight;
+        s.rotation = 0; s.flipH = false; s.flipV = false;
+        fitCover(id);
+        render(id);
+        selectBlock(id);
+      };
+      probe.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function fitCover(id){
+    var s = state[id];
+    var frame = getFrame(id);
+    var rect = frame.getBoundingClientRect();
+    var fw = rect.width, fh = rect.height;
+    if(!s.natW || !s.natH || !fw || !fh) return;
+    var scale = Math.max(fw / s.natW, fh / s.natH);
+    s.scale = scale;
+    s.x = 0; s.y = 0;
+  }
+
+  function deleteImage(id){
+    state[id] = defaultState();
+    render(id);
+    if(selectedId === id) syncPanel();
+  }
+
+  document.getElementById('clearAllBtn').addEventListener('click', function(){
+    if(!confirm('ล้างภาพทั้งหมดในทุกชิ้นแพทเทิร์นหรือไม่?')) return;
+    BLOCKS.forEach(function(b){ state[b.id] = defaultState(); render(b.id); });
+    syncPanel();
+  });
+
+  // ---------- Panel ----------
+  var panelEmpty = document.getElementById('panelEmpty');
+  var panelContent = document.getElementById('panelContent');
+  var pTitle = document.getElementById('pTitle');
+  var pSub = document.getElementById('pSub');
+  var pEmptyState = document.getElementById('pEmptyState');
+  var pHasImage = document.getElementById('pHasImage');
+  var scaleRange = document.getElementById('scaleRange');
+  var scaleVal = document.getElementById('scaleVal');
+  var rotRange = document.getElementById('rotRange');
+  var rotVal = document.getElementById('rotVal');
+  var flipHBtn = document.getElementById('flipHBtn');
+  var flipVBtn = document.getElementById('flipVBtn');
+
+  function syncPanel(){
+    if(!selectedId){
+      panelEmpty.hidden = false;
+      panelContent.hidden = true;
+      return;
+    }
+    var b = getBlock(selectedId);
+    var s = state[selectedId];
+    panelEmpty.hidden = true;
+    panelContent.hidden = false;
+    pTitle.textContent = b.label;
+    pSub.textContent = 'แจ็คเก็ต 2XL · ' + selectedId;
+
+    if(!s.src){
+      pEmptyState.hidden = false;
+      pHasImage.hidden = true;
+    } else {
+      pEmptyState.hidden = true;
+      pHasImage.hidden = false;
+      scaleRange.value = Math.round(s.scale * 100);
+      scaleVal.textContent = Math.round(s.scale * 100) + '%';
+      rotRange.value = Math.round(s.rotation);
+      rotVal.textContent = Math.round(s.rotation) + '°';
+      flipHBtn.classList.toggle('active', s.flipH);
+      flipVBtn.classList.toggle('active', s.flipV);
+    }
+  }
+
+  document.getElementById('pUploadBtn').addEventListener('click', function(){ openUploadFor(selectedId); });
+  document.getElementById('pChangeBtn').addEventListener('click', function(){ openUploadFor(selectedId); });
+
+  scaleRange.addEventListener('input', function(){
+    if(!selectedId) return;
+    var s = state[selectedId];
+    s.scale = clamp(scaleRange.value / 100, 0.1, 6);
+    scaleVal.textContent = Math.round(s.scale * 100) + '%';
+    render(selectedId);
+  });
+
+  rotRange.addEventListener('input', function(){
+    if(!selectedId) return;
+    var s = state[selectedId];
+    s.rotation = Number(rotRange.value);
+    rotVal.textContent = Math.round(s.rotation) + '°';
+    render(selectedId);
+  });
+
+  document.getElementById('rotCwBtn').addEventListener('click', function(){ rotateStep(90); });
+  document.getElementById('rotCcwBtn').addEventListener('click', function(){ rotateStep(-90); });
+  function rotateStep(delta){
+    if(!selectedId) return;
+    var s = state[selectedId];
+    s.rotation = normAngle(s.rotation + delta);
+    render(selectedId);
+    syncPanel();
+  }
+
+  flipHBtn.addEventListener('click', function(){
+    if(!selectedId) return;
+    state[selectedId].flipH = !state[selectedId].flipH;
+    render(selectedId); syncPanel();
+  });
+  flipVBtn.addEventListener('click', function(){
+    if(!selectedId) return;
+    state[selectedId].flipV = !state[selectedId].flipV;
+    render(selectedId); syncPanel();
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    if(!selectedId) return;
+    var s = state[selectedId];
+    s.rotation = 0; s.flipH = false; s.flipV = false;
+    fitCover(selectedId);
+    render(selectedId); syncPanel();
+  });
+
+  document.getElementById('deleteBtn').addEventListener('click', function(){
+    if(!selectedId) return;
+    deleteImage(selectedId);
+  });
+
+  document.addEventListener('keydown', function(e){
+    if(!cropOverlayHidden()) return;
+    if((e.key === 'Delete' || e.key === 'Backspace') && selectedId && document.activeElement.tagName !== 'INPUT'){
+      var s = state[selectedId];
+      if(s.src){ e.preventDefault(); deleteImage(selectedId); }
+    }
+  });
+  function cropOverlayHidden(){ return cropOverlay.hidden; }
+
+  // ---------- Crop modal ----------
+  var cropOverlay = document.getElementById('cropOverlay');
+  var cropStage = document.getElementById('cropStage');
+  var cropImg = document.getElementById('cropImg');
+  var cropRectEl = document.getElementById('cropRect');
+  var cropTargetId = null;
+  var cropDisplayScale = 1;
+
+  document.getElementById('cropBtn').addEventListener('click', function(){
+    if(!selectedId || !state[selectedId].src) return;
+    cropTargetId = selectedId;
+    cropImg.onload = function(){
+      var stageRect = cropStage.getBoundingClientRect();
+      var imgRect = cropImg.getBoundingClientRect();
+      cropDisplayScale = imgRect.width / state[cropTargetId].natW;
+      var left = imgRect.left - stageRect.left;
+      var top = imgRect.top - stageRect.top;
+      setCropRect(left, top, imgRect.width, imgRect.height, left, top, left+imgRect.width, top+imgRect.height);
+    };
+    cropImg.src = state[selectedId].src;
+    cropOverlay.hidden = false;
+  });
+
+  var cropBoundsCache = null;
+  function setCropRect(x,y,w,h, minX,minY,maxX,maxY){
+    cropRectEl.style.left = x + 'px';
+    cropRectEl.style.top = y + 'px';
+    cropRectEl.style.width = w + 'px';
+    cropRectEl.style.height = h + 'px';
+    cropBoundsCache = { minX:minX, minY:minY, maxX:maxX, maxY:maxY };
+  }
+
+  function cropRectBox(){
+    return {
+      x: parseFloat(cropRectEl.style.left),
+      y: parseFloat(cropRectEl.style.top),
+      w: parseFloat(cropRectEl.style.width),
+      h: parseFloat(cropRectEl.style.height)
+    };
+  }
+
+  // Move whole crop rect
+  cropRectEl.addEventListener('pointerdown', function(e){
+    if(e.target.classList.contains('crop-handle')) return;
+    var box = cropRectBox();
+    cropCtx = { mode:'move', startX:e.clientX, startY:e.clientY, box:box };
+    cropRectEl.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  Array.prototype.forEach.call(cropRectEl.querySelectorAll('.crop-handle'), function(h){
+    h.addEventListener('pointerdown', function(e){
+      var box = cropRectBox();
+      cropCtx = { mode:'resize', handle:h.dataset.h, startX:e.clientX, startY:e.clientY, box:box };
+      h.setPointerCapture(e.pointerId);
+      e.stopPropagation();
+      e.preventDefault();
+    });
+  });
+
+  cropStage.addEventListener('pointermove', function(e){
+    if(!cropCtx || !cropBoundsCache) return;
+    var dx = e.clientX - cropCtx.startX;
+    var dy = e.clientY - cropCtx.startY;
+    var b = cropBoundsCache;
+    var box = cropCtx.box;
+    var MIN = 24;
+
+    if(cropCtx.mode === 'move'){
+      var nx = clamp(box.x + dx, b.minX, b.maxX - box.w);
+      var ny = clamp(box.y + dy, b.minY, b.maxY - box.h);
+      setCropRect(nx, ny, box.w, box.h, b.minX, b.minY, b.maxX, b.maxY);
+    } else {
+      var x1 = box.x, y1 = box.y, x2 = box.x + box.w, y2 = box.y + box.h;
+      var h = cropCtx.handle;
+      if(h === 'nw'){ x1 = clamp(box.x+dx, b.minX, x2-MIN); y1 = clamp(box.y+dy, b.minY, y2-MIN); }
+      if(h === 'ne'){ x2 = clamp(box.x+box.w+dx, x1+MIN, b.maxX); y1 = clamp(box.y+dy, b.minY, y2-MIN); }
+      if(h === 'sw'){ x1 = clamp(box.x+dx, b.minX, x2-MIN); y2 = clamp(box.y+box.h+dy, y1+MIN, b.maxY); }
+      if(h === 'se'){ x2 = clamp(box.x+box.w+dx, x1+MIN, b.maxX); y2 = clamp(box.y+box.h+dy, y1+MIN, b.maxY); }
+      setCropRect(x1, y1, x2-x1, y2-y1, b.minX, b.minY, b.maxX, b.maxY);
+    }
+  });
+  cropStage.addEventListener('pointerup', function(){ cropCtx = null; });
+  cropStage.addEventListener('pointercancel', function(){ cropCtx = null; });
+
+  document.getElementById('cropCancelBtn').addEventListener('click', closeCrop);
+  cropOverlay.addEventListener('click', function(e){ if(e.target === cropOverlay) closeCrop(); });
+  function closeCrop(){ cropOverlay.hidden = true; cropTargetId = null; }
+
+  document.getElementById('cropApplyBtn').addEventListener('click', function(){
+    if(!cropTargetId) return;
+    var s = state[cropTargetId];
+    var stageRect = cropStage.getBoundingClientRect();
+    var imgRect = cropImg.getBoundingClientRect();
+    var box = cropRectBox();
+    // box coords are relative to cropStage; convert to relative-to-image, then to natural pixels
+    var relX = (stageRect.left + box.x) - imgRect.left;
+    var relY = (stageRect.top + box.y) - imgRect.top;
+    var sx = clamp(relX / cropDisplayScale, 0, s.natW);
+    var sy = clamp(relY / cropDisplayScale, 0, s.natH);
+    var sw = clamp(box.w / cropDisplayScale, 1, s.natW - sx);
+    var sh = clamp(box.h / cropDisplayScale, 1, s.natH - sy);
+
+    var canvas = document.createElement('canvas');
+    canvas.width = Math.round(sw);
+    canvas.height = Math.round(sh);
+    var ctx = canvas.getContext('2d');
+    var srcImg = new Image();
+    srcImg.onload = function(){
+      ctx.drawImage(srcImg, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      var dataUrl = canvas.toDataURL('image/png');
+      s.src = dataUrl;
+      s.natW = canvas.width;
+      s.natH = canvas.height;
+      s.x = 0; s.y = 0;
+      fitCover(cropTargetId);
+      render(cropTargetId);
+      syncPanel();
+      closeCrop();
+    };
+    srcImg.src = s.src;
+  });
+
+  // initial paint
+  BLOCKS.forEach(function(b){ render(b.id); });
+})();
+</script>
+</body>
+</html>

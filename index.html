@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sportswear Mockup Generator</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome (Icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Cropper.js -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+
+    <!-- html2canvas & UTIF.js (For Exporting) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #1a1a2e; overflow-x: hidden; }
+        
+        /* Layouts */
+        .split-layout { display: flex; width: 100vw; min-height: 100vh; }
+        .left-panel { flex: 1; padding: 2rem; position: relative; transition: background 0.3s ease; }
+        .right-panel { flex: 1; background-color: #16161a; padding: 2rem; display: flex; flex-direction: column; border-left: 2px solid #2d2d3b; }
+
+        /* Workspace Blocks (แผ่นหน้า, หลัง, ปก) - ทรงสี่เหลี่ยม */
+        .workspace-block {
+            background-color: white;
+            border-radius: 8px;
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+            border: 2px dashed #cbd5e1; /* Default border */
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .workspace-block:hover { border-color: #3b82f6; background-color: #f8fafc; }
+        /* When active, show an outline instead of replacing the border, so custom borders stay visible */
+        .workspace-block.active { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.4); }
+        
+        .workspace-label {
+            color: #94a3b8; font-weight: 600; pointer-events: none; z-index: 10;
+            background: rgba(255,255,255,0.8); padding: 4px 12px; border-radius: 20px; font-size: 0.9rem;
+        }
+
+        /* Layers within blocks */
+        .layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .bg-layer { z-index: 1; }
+        .img-layer { z-index: 2; background-repeat: no-repeat; background-position: center; }
+
+        /* Toolbox Panel */
+        .toolbox {
+            position: fixed; bottom: -400px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 800px; background: white; padding: 20px;
+            border-radius: 16px 16px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.2);
+            transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 50;
+        }
+        .toolbox.open { bottom: 0; }
+
+        /* Modals */
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .overlay.active { opacity: 1; pointer-events: all; }
+        
+        .cropper-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+            background: white; border-radius: 12px; padding: 20px; z-index: 101;
+            opacity: 0; pointer-events: none; transition: all 0.3s;
+            width: 90vw; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column;
+        }
+        .cropper-modal.active { opacity: 1; pointer-events: all; transform: translate(-50%, -50%) scale(1); }
+        .cropper-modal.fullscreen { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
+        .cropper-container-wrapper { flex: 1; overflow: hidden; background: repeating-conic-gradient(#f1f5f9 0% 25%, transparent 0% 50%) 50% / 20px 20px; }
+        
+        /* Lightbox */
+        .lightbox-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 200; display: none; align-items: center; justify-content: center;
+        }
+        .lightbox-modal.active { display: flex; }
+        .lightbox-modal img { max-width: 95vw; max-height: 95vh; object-fit: contain; }
+
+        /* Export Menu */
+        .export-dropdown { display: none; }
+        .export-dropdown.show { display: block; }
+        
+        /* Utility class to hide elements during HTML2Canvas rendering */
+        .hide-on-export { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="split-layout">
+    
+    <!-- ==================== LEFT PANEL (WORKSPACE) ==================== -->
+    <section class="left-panel bg-gradient-to-br from-blue-100 to-blue-300" id="leftPanel">
+        
+        <!-- Header -->
+        <div class="mb-6 flex justify-between items-center text-slate-800">
+            <h1 class="text-2xl font-bold drop-shadow-md dynamic-text"><i class="fa-solid fa-layer-group"></i> พื้นที่ออกแบบ</h1>
+            
+            <div class="flex items-center gap-3">
+                <!-- Color picker for text -->
+                <div class="flex items-center bg-white/50 px-3 py-1.5 rounded-lg border border-white/50 shadow-sm" data-html2canvas-ignore="true">
+                    <label for="globalTextColor" class="text-sm font-bold text-slate-700 mr-2 cursor-pointer mb-0 flex items-center gap-1"><i class="fa-solid fa-font"></i> สีข้อความ</label>
+                    <input type="color" id="globalTextColor" value="#334155" class="w-6 h-6 p-0 border-none rounded cursor-pointer bg-transparent" oninput="changeGlobalTextColor(this.value)">
+                </div>
+
+                <button onclick="selectPart('workspaceBg', 'bg')" class="bg-white/50 hover:bg-white/80 text-slate-800 px-4 py-2 rounded-lg font-semibold shadow-sm transition-all border border-white/50" data-html2canvas-ignore="true">
+                    <i class="fa-solid fa-fill-drip"></i> สีพื้นหลังกระดาน
+                </button>
+
+                <!-- Export Button -->
+                <div class="relative" data-html2canvas-ignore="true">
+                    <button onclick="toggleExportMenu(event)" class="bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-lg font-semibold shadow-lg transition-all flex items-center gap-2">
+                        <i class="fa-solid fa-download"></i> บันทึกภาพ
+                    </button>
+                    <!-- Dropdown -->
+                    <div id="exportMenu" class="export-dropdown absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl overflow-hidden border border-slate-200 z-50">
+                        <button onclick="exportImage('png')" class="w-full text-left px-4 py-3 text-sm hover:bg-slate-100 font-semibold border-b"><i class="fa-regular fa-image"></i> บันทึกเป็น PNG</button>
+                        <button onclick="exportImage('jpeg')" class="w-full text-left px-4 py-3 text-sm hover:bg-slate-100 font-semibold border-b"><i class="fa-solid fa-image"></i> บันทึกเป็น JPEG</button>
+                        <button onclick="exportImage('tiff')" class="w-full text-left px-4 py-3 text-sm hover:bg-slate-100 font-semibold"><i class="fa-solid fa-file-image"></i> บันทึกเป็น TIFF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Layout Area -->
+        <div class="flex flex-col items-center gap-6 max-w-2xl mx-auto mt-4 pb-20">
+            
+            <!-- ปก -->
+            <div class="flex gap-4 items-center w-full">
+                <span class="text-slate-700 font-bold w-16 text-right drop-shadow-sm dynamic-text">ปก</span>
+                <div id="block-collar" class="workspace-block h-16 flex-1" onclick="selectPart('collar', 'block')">
+                    <div class="layer bg-layer"></div><div class="layer img-layer"></div>
+                    <span class="workspace-label" data-html2canvas-ignore="true">คลิกเพื่อออกแบบ</span>
+                </div>
+            </div>
+
+            <!-- แผ่นหน้า & แผ่นหลัง -->
+            <div class="flex gap-6 w-full h-[400px]">
+                <div class="flex flex-col items-center gap-2 flex-1">
+                    <span class="text-slate-700 font-bold drop-shadow-sm dynamic-text">แผ่นหน้า</span>
+                    <div id="block-front" class="workspace-block w-full h-full" onclick="selectPart('front', 'block')">
+                        <div class="layer bg-layer"></div><div class="layer img-layer"></div>
+                        <span class="workspace-label" data-html2canvas-ignore="true">คลิกเพื่อออกแบบ</span>
+                    </div>
+                </div>
+                <div class="flex flex-col items-center gap-2 flex-1">
+                    <span class="text-slate-700 font-bold drop-shadow-sm dynamic-text">แผ่นหลัง</span>
+                    <div id="block-back" class="workspace-block w-full h-full" onclick="selectPart('back', 'block')">
+                        <div class="layer bg-layer"></div><div class="layer img-layer"></div>
+                        <span class="workspace-label" data-html2canvas-ignore="true">คลิกเพื่อออกแบบ</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- แขนซ้าย & แขนขวา (สี่เหลี่ยมแนวนอน สามารถปรับความสูงได้) -->
+            <div class="flex flex-col gap-3 w-full mt-2">
+                <!-- ตัวเลือกรูปแบบแขน -->
+                <div class="flex justify-between items-center w-full bg-white/40 p-2 rounded-lg border border-white/50 shadow-sm" data-html2canvas-ignore="true">
+                    <span class="text-slate-700 font-bold drop-shadow-sm flex items-center gap-2 dynamic-text"><i class="fa-solid fa-shirt"></i> รูปแบบแขน</span>
+                    <select onchange="changeSleeveType(this.value)" class="text-sm border border-slate-300 rounded px-3 py-1.5 bg-white text-slate-700 outline-none focus:border-blue-500 shadow-sm cursor-pointer font-medium">
+                        <option value="short">แขนสั้น (Short Sleeve)</option>
+                        <option value="long">แขนยาว (Long Sleeve)</option>
+                    </select>
+                </div>
+                
+                <!-- กรอบพื้นที่แขน -->
+                <div class="flex gap-6 h-[250px] transition-all duration-300" id="sleevesContainer">
+                    <div class="flex flex-col items-center gap-2 flex-1">
+                        <span class="text-slate-700 font-bold drop-shadow-sm dynamic-text">แขนซ้าย</span>
+                        <div id="block-leftSleeve" class="workspace-block w-full h-full" onclick="selectPart('leftSleeve', 'block')">
+                            <div class="layer bg-layer"></div><div class="layer img-layer"></div>
+                            <span class="workspace-label" data-html2canvas-ignore="true">คลิกเพื่อออกแบบ</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-center gap-2 flex-1">
+                        <span class="text-slate-700 font-bold drop-shadow-sm dynamic-text">แขนขวา</span>
+                        <div id="block-rightSleeve" class="workspace-block w-full h-full" onclick="selectPart('rightSleeve', 'block')">
+                            <div class="layer bg-layer"></div><div class="layer img-layer"></div>
+                            <span class="workspace-label" data-html2canvas-ignore="true">คลิกเพื่อออกแบบ</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ==================== RIGHT PANEL (REFERENCE) ==================== -->
+    <section class="right-panel">
+        <div class="mb-4 flex justify-between items-center text-white">
+            <h2 class="text-xl font-bold"><i class="fa-regular fa-image"></i> พื้นที่ภาพอ้างอิง</h2>
+        </div>
+        
+        <!-- Upload Box / Image Display -->
+        <!-- เพิ่ม onclick ให้เปิด file dialog เมื่อคลิกที่พื้นที่ -->
+        <div id="refUploadBox" class="flex-1 border-2 border-dashed border-slate-600 rounded-xl bg-slate-800/50 flex items-center justify-center relative overflow-hidden group cursor-pointer" onclick="document.getElementById('refImageInput').click()">
+            
+            <input type="file" id="refImageInput" accept="image/*" class="hidden" onchange="loadRefImage(event)">
+            
+            <div id="refPlaceholder" class="text-slate-400 text-center pointer-events-none transition-opacity group-hover:opacity-70">
+                <i class="fa-solid fa-cloud-arrow-up text-5xl mb-3"></i>
+                <p class="font-semibold text-lg">คลิกเพื่ออัปโหลดภาพอ้างอิง / Mockup</p>
+                <p class="text-sm opacity-70">JPG, PNG</p>
+            </div>
+
+            <img id="refImgDisplay" src="" alt="" class="absolute inset-0 w-full h-full object-contain hidden z-10">
+            
+            <!-- Tooltip & Fullscreen Button for Ref Image -->
+            <div id="refControls" class="absolute inset-0 bg-black/60 hidden group-hover:flex flex-col items-center justify-center gap-4 z-30 transition-all opacity-0 group-hover:opacity-100">
+                <!-- หยุด event propagation เพื่อไม่ให้ trigger input file เมื่อกดปุ่มขยายจอ -->
+                <button onclick="openLightbox(event)" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-full font-bold shadow-lg">
+                    <i class="fa-solid fa-expand"></i> ขยายเต็มจอ
+                </button>
+                <p class="text-white text-sm">หรือคลิกที่พื้นที่ว่างเพื่อเปลี่ยนรูปภาพ</p>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<!-- ==================== TOOLBOX MODAL ==================== -->
+<div id="toolbox" class="toolbox">
+    <div class="flex justify-between items-center mb-4 pb-2 border-b">
+        <h3 class="font-bold text-lg text-slate-800" id="toolboxTitle">เครื่องมือแก้ไข</h3>
+        <button onclick="closeToolbox()" class="text-slate-400 hover:text-red-500 text-xl"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <!-- เปลี่ยนเป็น grid-cols-4 เพื่อเพิ่มคอลัมน์ตั้งค่าเส้นขอบ -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        
+        <!-- Col 1: Background Color -->
+        <div class="space-y-3">
+            <label class="block text-sm font-bold text-slate-600"><i class="fa-solid fa-fill-drip"></i> สีพื้นฐาน (Solid)</label>
+            <div class="flex items-center gap-2">
+                <input type="color" id="solidColor" class="w-12 h-12 rounded cursor-pointer border-none" oninput="applySolidColor()">
+                <button onclick="clearBackground()" class="text-sm bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded border">ล้างสี</button>
+            </div>
+        </div>
+
+        <!-- Col 2: Gradient -->
+        <div class="space-y-3 border-l pl-4">
+            <label class="block text-sm font-bold text-slate-600"><i class="fa-solid fa-palette"></i> ไล่สี (Gradient)</label>
+            <div class="flex items-center gap-2">
+                <input type="color" id="gradColor1" value="#1e3a8a" class="w-10 h-10 rounded cursor-pointer border-none" oninput="applyGradient()">
+                <span>ถึง</span>
+                <input type="color" id="gradColor2" value="#60a5fa" class="w-10 h-10 rounded cursor-pointer border-none" oninput="applyGradient()">
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="range" id="gradAngle" min="0" max="360" value="180" class="w-full" oninput="applyGradient()">
+                <span id="angleValue" class="text-xs text-slate-500 w-10">180°</span>
+            </div>
+        </div>
+        
+        <!-- Col 3: Border/Stroke (NEW) -->
+        <div class="space-y-3 border-l pl-4" id="toolboxBorderSection">
+            <label class="block text-sm font-bold text-slate-600"><i class="fa-solid fa-border-all"></i> เส้นขอบ (Stroke)</label>
+            
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs w-12">ขนาด:</span>
+                    <input type="range" id="borderWidth" min="0" max="10" value="2" class="w-full" oninput="applyBorder()">
+                    <span id="borderWidthValue" class="text-xs text-slate-500 w-6">2px</span>
+                </div>
+                
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="text-xs w-12">สี:</span>
+                    <input type="color" id="borderColor" value="#cbd5e1" class="w-10 h-8 rounded cursor-pointer border-none" oninput="applyBorder()">
+                </div>
+                
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="text-xs w-12">สไตล์:</span>
+                    <select id="borderStyle" onchange="applyBorder()" class="text-sm border rounded px-2 py-1 outline-none w-full">
+                        <option value="solid">เส้นทึบ (Solid)</option>
+                        <option value="dashed" selected>เส้นประ (Dashed)</option>
+                        <option value="dotted">เส้นจุด (Dotted)</option>
+                        <option value="none">ไม่มีเส้น (None)</option>
+                    </select>
+                </div>
+                
+                <!-- ปุ่มปรับเส้นขอบทั้งหมด -->
+                <button onclick="applyBorderToAll()" class="w-full mt-2 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 py-1 rounded border shadow-sm flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-clone"></i> ใช้เส้นขอบนี้กับทุกบล็อค
+                </button>
+            </div>
+        </div>
+
+        <!-- Col 4: Image / Pattern -->
+        <div class="space-y-3 border-l pl-4" id="toolboxImageSection">
+            <label class="block text-sm font-bold text-slate-600"><i class="fa-regular fa-image"></i> รูปภาพ / ลวดลาย</label>
+            
+            <div class="relative w-full">
+                <button class="w-full bg-blue-50 text-blue-600 border border-blue-200 py-2 rounded font-semibold hover:bg-blue-100 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-upload"></i> อัปโหลดรูปภาพใหม่
+                </button>
+                <input type="file" id="imageInput" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleImageUpload(event)">
+            </div>
+
+            <!-- การจัดวางภาพ -->
+            <div class="mt-2" id="imageFitControl">
+                <label class="block text-xs font-bold text-slate-500 mb-1">การจัดวางภาพ</label>
+                <select id="imageFitSelect" onchange="applyImageFit()" class="w-full text-sm border rounded px-2 py-1 outline-none focus:border-blue-500">
+                    <option value="100% 100%">ยืดพอดีกรอบ (Stretch)</option>
+                    <option value="cover">เติมเต็ม (Cover)</option>
+                    <option value="contain">แสดงทั้งภาพ (Contain)</option>
+                </select>
+            </div>
+            
+            <button onclick="removeImage()" class="w-full mt-2 text-sm text-red-500 hover:bg-red-50 py-1 rounded border border-red-100 hidden" id="removeImgBtn"><i class="fa-regular fa-trash-can"></i> ลบรูปภาพ</button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ==================== CROPPER MODAL ==================== -->
+<div class="overlay" id="cropOverlay"></div>
+<div class="cropper-modal shadow-2xl" id="cropModal">
+    <div class="flex justify-between items-center mb-3">
+        <h3 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-crop-simple"></i> ตัดแต่งรูปภาพ (Crop & Edit)</h3>
+        <div class="flex gap-2">
+            <button onclick="toggleCropFullscreen()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 w-8 h-8 rounded flex items-center justify-center"><i class="fa-solid fa-expand"></i></button>
+            <button onclick="closeCropper()" class="bg-slate-100 hover:bg-red-100 text-slate-600 hover:text-red-500 w-8 h-8 rounded flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
+    
+    <div class="cropper-container-wrapper rounded border">
+        <img id="cropImage" src="" alt="To Crop" style="max-width: 100%; display: block;">
+    </div>
+    
+    <!-- Toolbar -->
+    <div class="mt-4 flex flex-wrap justify-between items-center gap-3">
+        <div class="flex gap-1 bg-slate-100 p-1 rounded border">
+            <button class="px-3 py-1 bg-white rounded shadow-sm text-slate-600 hover:text-blue-500" onclick="cropper.zoom(0.1)" title="ซูมเข้า"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+            <button class="px-3 py-1 bg-white rounded shadow-sm text-slate-600 hover:text-blue-500" onclick="cropper.zoom(-0.1)" title="ซูมออก"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+            <div class="w-px bg-slate-300 mx-1"></div>
+            <button class="px-3 py-1 bg-white rounded shadow-sm text-slate-600 hover:text-blue-500" onclick="cropper.move(-10, 0)"><i class="fa-solid fa-arrow-left"></i></button>
+            <button class="px-3 py-1 bg-white rounded shadow-sm text-slate-600 hover:text-blue-500" onclick="cropper.move(10, 0)"><i class="fa-solid fa-arrow-right"></i></button>
+            <button class="px-3 py-1 bg-white rounded shadow-sm text-slate-600 hover:text-blue-500" onclick="cropper.move(0, -10)"><i class="fa-solid fa-arrow-up"></i></button>
+            <button class="px-3 py-1 bg-white rounded shadow-sm text-slate-600 hover:text-blue-500" onclick="cropper.move(0, 10)"><i class="fa-solid fa-arrow-down"></i></button>
+            <div class="w-px bg-slate-300 mx-1"></div>
+            <button class="px-3 py-1 bg-white rounded shadow-sm text-slate-600 hover:text-blue-500" onclick="cropper.rotate(45)" title="หมุน"><i class="fa-solid fa-rotate-right"></i></button>
+            <button class="px-3 py-1 bg-white rounded shadow-sm text-slate-600 hover:text-blue-500" onclick="cropper.reset()" title="คืนค่าเดิม"><i class="fa-solid fa-rotate-left"></i></button>
+        </div>
+        
+        <div class="flex gap-2">
+            <button onclick="closeCropper()" class="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded">ยกเลิก</button>
+            <button onclick="applyFullImage()" class="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded shadow-md"><i class="fa-regular fa-image"></i> ใช้ทั้งภาพ (ไม่ตัด)</button>
+            <button onclick="applyCrop()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded shadow-md"><i class="fa-solid fa-check"></i> นำไปใช้ (Apply)</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== LIGHTBOX (FULLSCREEN IMAGE) ==================== -->
+<div id="lightbox" class="lightbox-modal" onclick="closeLightbox()">
+    <button class="absolute top-6 right-6 text-white hover:text-red-400 text-4xl z-50"><i class="fa-solid fa-xmark"></i></button>
+    <img id="lightboxImg" src="" alt="Fullscreen Reference" onclick="event.stopPropagation()">
+</div>
+
+<!-- ==================== CUSTOM ALERT MODAL ==================== -->
+<div id="customAlertModal" class="fixed top-[-100px] left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-4 rounded-xl shadow-2xl z-[999] opacity-0 transition-all duration-300 flex items-center gap-3 border border-slate-700 pointer-events-none">
+    <i class="fa-solid fa-circle-check text-green-400 text-2xl"></i>
+    <span id="customAlertMessage" class="font-medium">Message</span>
+</div>
+
+<script>
+    // --- 1. STATE & INITIALIZATION ---
+    let activePartId = null; 
+    let activeType = null; // 'block' or 'bg'
+    let cropper = null;
+    let tempImageSrc = null; // เก็บรูปต้นฉบับก่อน crop
+
+    const partNames = {
+        'workspaceBg': 'สีพื้นหลังกระดาน',
+        'collar': 'ปกเสื้อ',
+        'front': 'แผ่นหน้า',
+        'back': 'แผ่นหลัง',
+        'leftSleeve': 'แขนซ้าย',
+        'rightSleeve': 'แขนขวา'
+    };
+
+    // Store settings for each part. Added border properties.
+    const state = {
+        workspaceBg: { bgValue: 'linear-gradient(to bottom right, #dbeafe, #93c5fd)', type: 'gradient' }
+    };
+    ['collar', 'front', 'back', 'leftSleeve', 'rightSleeve'].forEach(id => {
+        state[id] = { 
+            bgValue: '#ffffff', 
+            type: 'solid', 
+            imgData: null, 
+            imgFit: '100% 100%',
+            borderWidth: '2',
+            borderColor: '#cbd5e1',
+            borderStyle: 'dashed'
+        };
+    });
+
+    window.onload = () => {
+        document.getElementById('leftPanel').style.background = state.workspaceBg.bgValue;
+        // Initialize visuals for all blocks to apply default state (like borders)
+        ['collar', 'front', 'back', 'leftSleeve', 'rightSleeve'].forEach(id => {
+            updateVisual(id);
+        });
+    };
+
+    // --- 2. TOOLBOX MANAGEMENT ---
+    function selectPart(partId, type) {
+        // Clear active classes
+        document.querySelectorAll('.workspace-block').forEach(b => b.classList.remove('active'));
+        
+        activePartId = partId;
+        activeType = type;
+        
+        if (type === 'block') {
+            document.getElementById(`block-${partId}`).classList.add('active');
+            document.getElementById('toolboxImageSection').style.display = 'block';
+            document.getElementById('toolboxBorderSection').style.display = 'block';
+            
+            // Sync image settings to UI
+            const st = state[partId];
+            if(st.imgData) {
+                document.getElementById('removeImgBtn').classList.remove('hidden');
+                document.getElementById('imageFitControl').classList.remove('hidden');
+                document.getElementById('imageFitSelect').value = st.imgFit;
+            } else {
+                document.getElementById('removeImgBtn').classList.add('hidden');
+                document.getElementById('imageFitControl').classList.add('hidden');
+            }
+            
+            // Sync border settings to UI
+            document.getElementById('borderWidth').value = st.borderWidth;
+            document.getElementById('borderWidthValue').innerText = `${st.borderWidth}px`;
+            document.getElementById('borderColor').value = st.borderColor;
+            document.getElementById('borderStyle').value = st.borderStyle;
+
+        } else {
+            document.getElementById('toolboxImageSection').style.display = 'none'; // Background cant have image
+            document.getElementById('toolboxBorderSection').style.display = 'none'; // Background cant have border
+        }
+
+        document.getElementById('toolboxTitle').innerText = `ปรับแต่ง: ${partNames[partId]}`;
+        document.getElementById('toolbox').classList.add('open');
+    }
+
+    function closeToolbox() {
+        document.getElementById('toolbox').classList.remove('open');
+        document.querySelectorAll('.workspace-block').forEach(b => b.classList.remove('active'));
+        activePartId = null;
+    }
+
+    // --- 3. COLOR & GRADIENT ---
+    function applySolidColor() {
+        if(!activePartId) return;
+        const color = document.getElementById('solidColor').value;
+        state[activePartId].bgValue = color;
+        state[activePartId].type = 'solid';
+        updateVisual(activePartId);
+    }
+
+    function applyGradient() {
+        if(!activePartId) return;
+        const c1 = document.getElementById('gradColor1').value;
+        const c2 = document.getElementById('gradColor2').value;
+        const deg = document.getElementById('gradAngle').value;
+        
+        document.getElementById('angleValue').innerText = `${deg}°`;
+        const gradString = `linear-gradient(${deg}deg, ${c1}, ${c2})`;
+        
+        state[activePartId].bgValue = gradString;
+        state[activePartId].type = 'gradient';
+        updateVisual(activePartId);
+    }
+
+    function clearBackground() {
+        if(!activePartId) return;
+        state[activePartId].bgValue = 'transparent';
+        updateVisual(activePartId);
+    }
+
+    function updateVisual(partId) {
+        if(partId === 'workspaceBg') {
+            document.getElementById('leftPanel').style.background = state[partId].bgValue;
+            return;
+        }
+
+        const block = document.getElementById(`block-${partId}`);
+        const bgLayer = block.querySelector('.bg-layer');
+        const imgLayer = block.querySelector('.img-layer');
+        const st = state[partId];
+
+        // Update Background
+        bgLayer.style.background = st.bgValue;
+        
+        // Update Image
+        if (st.imgData) {
+            imgLayer.style.backgroundImage = `url(${st.imgData})`;
+            imgLayer.style.backgroundSize = st.imgFit;
+        } else {
+            imgLayer.style.backgroundImage = 'none';
+        }
+        
+        // Update Border
+        block.style.borderWidth = `${st.borderWidth}px`;
+        block.style.borderColor = st.borderColor;
+        block.style.borderStyle = st.borderStyle;
+    }
+    
+    // --- 3.5 BORDER / STROKE HANDLING ---
+    function applyBorder() {
+        if(!activePartId || activeType !== 'block') return;
+        
+        const width = document.getElementById('borderWidth').value;
+        const color = document.getElementById('borderColor').value;
+        const style = document.getElementById('borderStyle').value;
+        
+        document.getElementById('borderWidthValue').innerText = `${width}px`;
+        
+        state[activePartId].borderWidth = width;
+        state[activePartId].borderColor = color;
+        state[activePartId].borderStyle = style;
+        
+        updateVisual(activePartId);
+    }
+    
+    function applyBorderToAll() {
+        if(!activePartId || activeType !== 'block') return;
+        
+        const width = document.getElementById('borderWidth').value;
+        const color = document.getElementById('borderColor').value;
+        const style = document.getElementById('borderStyle').value;
+        
+        ['collar', 'front', 'back', 'leftSleeve', 'rightSleeve'].forEach(id => {
+            state[id].borderWidth = width;
+            state[id].borderColor = color;
+            state[id].borderStyle = style;
+            updateVisual(id);
+        });
+        
+        // นำไปใช้กับพื้นที่ภาพอ้างอิงฝั่งขวาด้วย
+        const refBox = document.getElementById('refUploadBox');
+        if(refBox) {
+            refBox.style.borderWidth = `${width}px`;
+            refBox.style.borderColor = color;
+            refBox.style.borderStyle = style;
+        }
+        
+        showCustomAlert("นำการตั้งค่าเส้นขอบไปใช้กับทุกชิ้นส่วนและพื้นที่อ้างอิงเรียบร้อยแล้ว");
+    }
+
+    // --- 4. IMAGE HANDLING (Toolbox) ---
+    function handleImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            tempImageSrc = e.target.result;
+            openCropper(tempImageSrc);
+        };
+        reader.readAsDataURL(file);
+        event.target.value = ''; // reset
+    }
+
+    function removeImage() {
+        if(!activePartId) return;
+        state[activePartId].imgData = null;
+        updateVisual(activePartId);
+        document.getElementById('removeImgBtn').classList.add('hidden');
+        document.getElementById('imageFitControl').classList.add('hidden');
+    }
+    
+    function applyImageFit() {
+        if(!activePartId) return;
+        const fitValue = document.getElementById('imageFitSelect').value;
+        state[activePartId].imgFit = fitValue;
+        updateVisual(activePartId);
+    }
+
+    // --- 5. CROPPER MODAL ---
+    function openCropper(imageSrc) {
+        const modal = document.getElementById('cropModal');
+        const overlay = document.getElementById('cropOverlay');
+        const imgElement = document.getElementById('cropImage');
+        
+        imgElement.src = imageSrc;
+        modal.classList.add('active');
+        overlay.classList.add('active');
+
+        // Destroy previous cropper
+        if (cropper) { cropper.destroy(); }
+        
+        // Timeout to let CSS modal transition finish so cropper reads dimensions correctly
+        setTimeout(() => {
+            let aspectRatio = NaN; // Free crop
+            if(activePartId === 'collar') aspectRatio = 5 / 1;
+            
+            cropper = new Cropper(imgElement, {
+                aspectRatio: aspectRatio,
+                viewMode: 1,
+                background: false,
+                autoCropArea: 0.9
+            });
+        }, 300);
+    }
+
+    function closeCropper() {
+        document.getElementById('cropModal').classList.remove('active');
+        document.getElementById('cropOverlay').classList.remove('active');
+        if (cropper) { cropper.destroy(); cropper = null; }
+    }
+    
+    function toggleCropFullscreen() {
+        document.getElementById('cropModal').classList.toggle('fullscreen');
+        if(cropper) {
+            setTimeout(() => cropper.resize(), 300);
+        }
+    }
+
+    function applyCrop() {
+        if (!cropper || !activePartId) return;
+        const canvas = cropper.getCroppedCanvas({ imageSmoothingQuality: 'high' });
+        
+        state[activePartId].imgData = canvas.toDataURL('image/png');
+        updateVisual(activePartId);
+        
+        document.getElementById('removeImgBtn').classList.remove('hidden');
+        document.getElementById('imageFitControl').classList.remove('hidden');
+        document.getElementById('imageFitSelect').value = state[activePartId].imgFit;
+        closeCropper();
+    }
+    
+    function applyFullImage() {
+        if(!tempImageSrc || !activePartId) return;
+        state[activePartId].imgData = tempImageSrc;
+        updateVisual(activePartId);
+        
+        document.getElementById('removeImgBtn').classList.remove('hidden');
+        document.getElementById('imageFitControl').classList.remove('hidden');
+        document.getElementById('imageFitSelect').value = state[activePartId].imgFit;
+        closeCropper();
+    }
+
+    // --- 6. RIGHT PANEL IMAGE (Reference) ---
+    function loadRefImage(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const display = document.getElementById('refImgDisplay');
+            display.src = e.target.result;
+            display.classList.remove('hidden');
+            
+            document.getElementById('refPlaceholder').classList.add('hidden');
+            document.getElementById('refControls').classList.remove('hidden');
+            
+            // Set for lightbox
+            document.getElementById('lightboxImg').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        // ไม่ต้อง reset value เพื่อให้สามารถเลือกไฟล์เดิมซ้ำได้ถ้าต้องการ
+    }
+    
+    function openLightbox(event) {
+        event.stopPropagation(); // หยุดการส่งผ่าน event ไปยัง parent element (เพื่อไม่ให้เปิด file dialog)
+        document.getElementById('lightbox').classList.add('active'); 
+    }
+    function closeLightbox() { document.getElementById('lightbox').classList.remove('active'); }
+
+    // --- 7. SLEEVE TOGGLE FUNCTION ---
+    function changeSleeveType(type) {
+        const container = document.getElementById('sleevesContainer');
+        
+        if (type === 'short') {
+            container.style.height = '250px'; // ความสูงสำหรับแขนสั้น
+        } else {
+            container.style.height = '400px'; // เพิ่มความสูงสำหรับแขนยาวให้ใหญ่ขึ้น
+        }
+    }
+
+    // --- 8. EXPORT MENU & EXPORTING ---
+    function toggleExportMenu(event) {
+        event.stopPropagation();
+        document.getElementById('exportMenu').classList.toggle('show');
+    }
+
+    // ซ่อนเมนู Export ถอยคลิกที่อื่น
+    window.onclick = function(event) {
+        if (!event.target.closest('.relative')) {
+            const menu = document.getElementById('exportMenu');
+            if (menu && menu.classList.contains('show')) menu.classList.remove('show');
+        }
+    }
+
+    function exportImage(format) {
+        // ปิดเมนูก่อนแคป
+        document.getElementById('exportMenu').classList.remove('show');
+
+        // แคปเจอร์ทั้งหน้าจอ (document.body) แทนการแคปแค่ leftPanel
+        html2canvas(document.body, { 
+            scale: 2, 
+            useCORS: true,
+            backgroundColor: '#1a1a2e' // สีพื้นหลังเผื่อส่วนที่โปร่งใส
+        }).then(canvas => {
+            if (format === 'tiff') {
+                const ctx = canvas.getContext('2d');
+                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const tiffFile = UTIF.encodeImage(imgData.data, canvas.width, canvas.height);
+                const blob = new Blob([tiffFile], {type: "image/tiff"});
+                const link = document.createElement("a");
+                link.download = "sportswear_design.tiff";
+                link.href = URL.createObjectURL(blob);
+                link.click();
+            } else {
+                const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+                const link = document.createElement('a');
+                link.download = `sportswear_design.${format}`;
+                link.href = canvas.toDataURL(mimeType, 1.0);
+                link.click();
+            }
+        });
+    }
+
+    // --- 9. GLOBAL SETTINGS (TEXT COLOR & MODAL) ---
+    function changeGlobalTextColor(color) {
+        document.querySelectorAll('.dynamic-text, .workspace-label').forEach(el => {
+            el.style.setProperty('color', color, 'important');
+        });
+    }
+
+    let alertTimeout;
+    function showCustomAlert(message) {
+        const modal = document.getElementById('customAlertModal');
+        document.getElementById('customAlertMessage').innerText = message;
+        
+        // เลื่อนลงมาแสดง
+        modal.style.top = '30px';
+        modal.classList.remove('opacity-0');
+        modal.classList.add('opacity-100');
+        
+        clearTimeout(alertTimeout);
+        alertTimeout = setTimeout(() => {
+            modal.classList.remove('opacity-100');
+            modal.classList.add('opacity-0');
+            modal.style.top = '-100px';
+        }, 3000); // แสดงข้อความ 3 วินาที
+    }
+
+</script>
+</body>
+</html>
