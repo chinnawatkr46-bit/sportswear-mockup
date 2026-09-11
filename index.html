@@ -427,10 +427,11 @@
     });
 
     // Helper Function to Create Pickr
-    function createPickr(selector, defaultColor, onChangeCallback) {
+    function createPickr(selector, defaultColor, onChangeCallback, pos = 'top-middle') {
         return Pickr.create({
             el: selector,
             theme: 'classic',
+            position: pos, // <-- เพิ่มคำสั่งกำหนดทิศทางการเปิดหน้าต่าง
             default: defaultColor,
             swatches: ['#000000', '#FFFFFF', '#ef4444', '#22c55e', '#3b82f6', '#eab308', '#06b6d4', '#d946ef'],
             components: {
@@ -450,28 +451,30 @@
         ['collar', 'front', 'back', 'leftSleeve', 'rightSleeve'].forEach(id => updateVisual(id));
 
         // Initialize Pickr Instances
-        pickers.globalText = createPickr('#globalTextColorPicker', '#334155', changeGlobalTextColor);
+        // 1. สีข้อความ (อยู่บนจอ) ให้เปิดลงด้านล่าง ('bottom-middle')
+        pickers.globalText = createPickr('#globalTextColorPicker', '#334155', changeGlobalTextColor, 'bottom-middle');
         
+        // 2. เครื่องมือใน Toolbox (อยู่ล่างจอ) ให้เปิดเด้งขึ้นบนทั้งหมด ('top-middle')
         pickers.solid = createPickr('#solidColorPicker', '#ffffff', (color) => {
             if(!activePartId) return;
             state[activePartId].bgValue = color;
             state[activePartId].type = 'solid';
             updateVisual(activePartId);
-        });
+        }, 'top-middle');
 
         pickers.grad1 = createPickr('#gradColor1Picker', currentGrad1, (color) => {
             currentGrad1 = color; applyGradient();
-        });
+        }, 'top-middle');
 
         pickers.grad2 = createPickr('#gradColor2Picker', currentGrad2, (color) => {
             currentGrad2 = color; applyGradient();
-        });
+        }, 'top-middle');
 
         pickers.border = createPickr('#borderColorPicker', '#cbd5e1', (color) => {
             if(!activePartId || activeType !== 'block') return;
             state[activePartId].borderColor = color;
             updateVisual(activePartId);
-        });
+        }, 'top-middle');
     };
 
     // --- 2. TOOLBOX MANAGEMENT ---
