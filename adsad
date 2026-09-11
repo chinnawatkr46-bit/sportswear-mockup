@@ -1,0 +1,23 @@
+[33mcommit 09aedf68f8d767b911a1b7ba177797c7a5c8a1b3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: chinnawatkr46-bit <chinnawat.kr46@gmail.com>
+Date:   Fri Sep 11 16:24:56 2026 +0700
+
+    แก้ไขโลโก้เว็บ
+
+[33mcommit 48ed3b11d3e4cc965e0ae8490f6fd7062db4793c[m
+Author: chinnawatkr46-bit <chinnawat.kr46@gmail.com>
+Date:   Fri Sep 11 12:01:43 2026 +0700
+
+    Update: เพิ่มระบบเลือกสีสไตล์ Photoshop, ขยายขนาดบล็อค, และซ่อนข้อความตอssน Export
+
+[33mcommit 9ee6457a637671ac70f95dd7568601dae7a7c820[m
+Author: chinnawatkr46-bit <chinnawat.kr46@gmail.com>
+Date:   Fri Sep 11 11:00:33 2026 +0700
+
+    Update: เพิ่มระบบเลือกสีสไตล์ Photoshop, ขยายขนาดบล็อค, และซ่อนข้อความตอน Export
+
+[33mcommit 9a784b7477d2baab976a2362f05f30f445420f92[m
+Author: chinnawatkr46-bit <chinnawat.kr46@gmail.com>
+Date:   Wed Sep 9 15:26:17 2026 +0700
+
+    Initial commit: Sportswear Mockup Generator V2
