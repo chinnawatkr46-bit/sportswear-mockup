@@ -138,7 +138,8 @@
         </div>
 
         <!-- Layout Area -->
-        <div class="flex flex-col items-center gap-6 max-w-2xl mx-auto mt-4 pb-20">
+        <!-- แก้ไขความกว้างสูงสุดจาก max-w-2xl เป็น max-w-4xl เพื่อให้บล็อคขยายใหญ่ขึ้นได้ -->
+        <div class="flex flex-col items-center gap-6 max-w-4xl mx-auto mt-4 pb-20">
             
             <!-- ปก -->
             <div class="flex gap-4 items-center w-full">
@@ -150,7 +151,8 @@
             </div>
 
             <!-- แผ่นหน้า & แผ่นหลัง -->
-            <div class="flex gap-6 w-full h-[400px]">
+            <!-- แก้ไขความสูงของแผ่นหน้าและหลัง จาก h-[400px] เป็น h-[550px] -->
+            <div class="flex gap-6 w-full h-[550px]">
                 <div class="flex flex-col items-center gap-2 flex-1">
                     <span class="text-slate-700 font-bold drop-shadow-sm dynamic-text">แผ่นหน้า</span>
                     <div id="block-front" class="workspace-block w-full h-full" onclick="selectPart('front', 'block')">
@@ -179,7 +181,8 @@
                 </div>
                 
                 <!-- กรอบพื้นที่แขน -->
-                <div class="flex gap-6 h-[250px] transition-all duration-300" id="sleevesContainer">
+                <!-- แก้ไขความสูงเริ่มต้นของแขนสั้น จาก h-[250px] เป็น h-[350px] -->
+                <div class="flex gap-6 h-[350px] transition-all duration-300" id="sleevesContainer">
                     <div class="flex flex-col items-center gap-2 flex-1">
                         <span class="text-slate-700 font-bold drop-shadow-sm dynamic-text">แขนซ้าย</span>
                         <div id="block-leftSleeve" class="workspace-block w-full h-full" onclick="selectPart('leftSleeve', 'block')">
@@ -314,9 +317,9 @@
             <div class="mt-2" id="imageFitControl">
                 <label class="block text-xs font-bold text-slate-500 mb-1">การจัดวางภาพ</label>
                 <select id="imageFitSelect" onchange="applyImageFit()" class="w-full text-sm border rounded px-2 py-1 outline-none focus:border-blue-500">
+                    <option value="contain" selected>แสดงทั้งภาพ (Contain)</option>
                     <option value="100% 100%">ยืดพอดีกรอบ (Stretch)</option>
                     <option value="cover">เติมเต็ม (Cover)</option>
-                    <option value="contain">แสดงทั้งภาพ (Contain)</option>
                 </select>
             </div>
             
@@ -401,7 +404,7 @@
             bgValue: '#ffffff', 
             type: 'solid', 
             imgData: null, 
-            imgFit: '100% 100%',
+            imgFit: 'contain', 
             borderWidth: '2',
             borderColor: '#cbd5e1',
             borderStyle: 'dashed'
@@ -519,17 +522,19 @@
     }
     
     // --- 3.5 BORDER / STROKE HANDLING ---
+    function applyBorderColor(colorCode) {
+        if(!activePartId || activeType !== 'block') return;
+        state[activePartId].borderColor = colorCode;
+        updateVisual(activePartId);
+    }
+
     function applyBorder() {
         if(!activePartId || activeType !== 'block') return;
-        
         const width = document.getElementById('borderWidth').value;
-        const color = document.getElementById('borderColor').value;
         const style = document.getElementById('borderStyle').value;
         
         document.getElementById('borderWidthValue').innerText = `${width}px`;
-        
         state[activePartId].borderWidth = width;
-        state[activePartId].borderColor = color;
         state[activePartId].borderStyle = style;
         
         updateVisual(activePartId);
@@ -539,8 +544,8 @@
         if(!activePartId || activeType !== 'block') return;
         
         const width = document.getElementById('borderWidth').value;
-        const color = document.getElementById('borderColor').value;
         const style = document.getElementById('borderStyle').value;
+        const color = state[activePartId].borderColor; // ใช้สีที่เก็บไว้ใน State
         
         ['collar', 'front', 'back', 'leftSleeve', 'rightSleeve'].forEach(id => {
             state[id].borderWidth = width;
@@ -685,9 +690,9 @@
         const container = document.getElementById('sleevesContainer');
         
         if (type === 'short') {
-            container.style.height = '250px'; // ความสูงสำหรับแขนสั้น
+            container.style.height = '350px'; // เพิ่มความสูงสำหรับแขนสั้นให้ใหญ่และชัดขึ้น
         } else {
-            container.style.height = '400px'; // เพิ่มความสูงสำหรับแขนยาวให้ใหญ่ขึ้น
+            container.style.height = '600px'; // เพิ่มความสูงสำหรับแขนยาวให้สัดส่วนยาวขึ้น
         }
     }
 
