@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สำหรับเพิ่มโลโก้แผ่นหลังกับมอคอัพส่งลูกค้า</title>
+    <link rel="icon" type="image/png" href="logo2.png">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome (Icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Fabric.js (Core Canvas Engine for Move Tool & BG Removal) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+
+    <!-- html2canvas & UTIF.js (For Exporting) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
+
+    <!-- Pickr (Professional Real-time Color Picker) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/classic.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #1a1a2e; overflow: hidden; margin: 0; padding: 0; }
+        
+        /* Layouts */
+        .split-layout { display: flex; width: 100vw; height: 100vh; }
+        .left-panel { flex: 1; position: relative; display: flex; flex-direction: column; transition: background 0.1s; }
+        .right-panel { flex: 1; background-color: #16161a; position: relative; border-left: 2px solid #2d2d3b; overflow: hidden; }
+
+        /* Canvas Wrapper (ใช้ CSS เรนเดอร์พื้นหลังผ่าน GPU เพื่อลดแลค) */
+        #canvasWrapper { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; background: #d11c1c; transition: background 0.1s ease-out; }
+        
+        /* Toolbar (Top) */
+        .top-toolbar {
+            position: absolute; top: 20px; left: 20px; right: 20px;
+            display: flex; justify-content: space-between; align-items: flex-start; z-index: 50;
+        }
+
+        /* Tools Panel (Floating) */
+        .tools-panel {
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
+            padding: 12px 15px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.5); display: flex; gap: 15px; align-items: center; flex-wrap: wrap; max-width: 70%;
+        }
+
+        .tool-btn {
+            background: #f1f5f9; color: #334155; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.9rem;
+            transition: all 0.2s; display: flex; align-items: center; gap: 6px; cursor: pointer; border: 1px solid #e2e8f0;
+        }
+        .tool-btn:hover { background: #e2e8f0; color: #0f172a; }
+        .tool-btn.primary { background: #3b82f6; color: white; border-color: #2563eb; }
+        .tool-btn.primary:hover { background: #2563eb; }
+        .tool-btn.danger { background: #ef4444; color: white; border-color: #dc2626; }
+        .tool-btn.danger:hover { background: #dc2626; }
+
+        /* Object Properties Panel (Shows when image/text is selected) */
+        .obj-panel {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px);
+            background: white; padding: 15px 25px; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.25);
+            display: flex; gap: 20px; align-items: center; opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 50;
+        }
+        .obj-panel.active { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: all; }
+
+        /* Modals & Export */
+        .export-dropdown { display: none; }
+        .export-dropdown.show { display: block; }
+        
+        .lightbox-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 200; display: none; align-items: center; justify-content: center;
+        }
+        .lightbox-modal.active { display: flex; }
+        .lightbox-modal img { max-width: 95vw; max-height: 95vh; object-fit: contain; }
+
+        /* Custom Pickr adjustments */
+        .pcr-button { border: 1px solid #cbd5e1; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+
+<div class="split-layout">
+    
+    <!-- ==================== LEFT PANEL (WORKSPACE CANVAS) ==================== -->
+    <section class="left-panel" id="leftPanel">
+        
+        <!-- Top Toolbar -->
+        <div class="top-toolbar" data-html2canvas-ignore="true">
+            <div class="tools-panel">
+                
+                <!-- Background Controls -->
+                <div class="flex flex-col gap-2 pr-4 border-r border-slate-300">
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs font-bold text-slate-700 m-0"><i class="fa-solid fa-palette"></i> แบบพื้นหลัง:</label>
+                        <select id="bgTypeSelector" onchange="toggleBgType(this.value)" class="text-xs border rounded px-2 py-1 outline-none font-semibold">
+                            <option value="solid">สีพื้น (Solid)</option>
+                            <option value="gradient">ไล่สี (Gradient)</option>
+                        </select>
+                        
+                        <!-- ซ่อนไว้ก่อน จะแสดงเมื่อเลือก "ไล่สี" -->
+                        <select id="gradStyleSelector" onchange="changeGradStyle(this.value)" class="hidden text-xs border border-blue-300 bg-blue-50 text-blue-700 rounded px-2 py-1 outline-none font-bold cursor-pointer">
+                            <option value="linear">Linear</option>
+                            <option value="radial">Radial</option>
+                            <option value="angle">Angle</option>
+                            <option value="reflected">Reflected</option>
+                            <option value="diamond">Diamond</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Solid Color Picker -->
+                    <div id="solidBgContainer" class="flex items-center gap-2">
+                        <div id="solidColorPicker"></div>
+                        <span class="text-xs text-slate-500">เลือกสี</span>
+                    </div>
+
+                    <!-- Gradient Color Pickers (Hidden by default) -->
+                    <div id="gradientBgContainer" class="hidden flex-col gap-2">
+                        <div class="flex items-center gap-2">
+                            <div id="gradColor1Picker"></div>
+                            <span class="text-xs text-slate-400">ถึง</span>
+                            <div id="gradColor2Picker"></div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="range" id="gradAngle" min="0" max="360" value="135" class="w-20 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="gradAngleText" class="text-xs text-slate-500 w-8">135°</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Object Tools -->
+                <button class="tool-btn" onclick="document.getElementById('logoInput').click()">
+                    <i class="fa-solid fa-image"></i> เพิ่มรูปลงพื้นที่
+                </button>
+                <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="addLogo(event)">
+                
+                <button class="tool-btn" onclick="addText()">
+                    <i class="fa-solid fa-t"></i> เพิ่มข้อความ
+                </button>
+            </div>
+
+            <!-- Export Button -->
+            <div class="relative">
+                <button onclick="toggleExportMenu(event)" class="tool-btn primary !py-3 !px-5 shadow-lg text-lg">
+                    <i class="fa-solid fa-download"></i> บันทึกภาพ
+                </button>
+                <div id="exportMenu" class="export-dropdown absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl overflow-hidden border border-slate-200 z-50">
+                    <button onclick="exportImage('png')" class="w-full text-left px-4 py-3 text-sm hover:bg-slate-100 font-semibold border-b"><i class="fa-regular fa-image"></i> บันทึกเป็น PNG</button>
+                    <button onclick="exportImage('jpeg')" class="w-full text-left px-4 py-3 text-sm hover:bg-slate-100 font-semibold border-b"><i class="fa-solid fa-image"></i> บันทึกเป็น JPEG</button>
+                    <button onclick="exportImage('tiff')" class="w-full text-left px-4 py-3 text-sm hover:bg-slate-100 font-semibold"><i class="fa-solid fa-file-image"></i> บันทึกเป็น TIFF</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Smart Canvas -->
+        <div id="canvasWrapper">
+            <canvas id="mainCanvas"></canvas>
+        </div>
+
+        <!-- Object Properties Panel -->
+        <div class="obj-panel" id="objPanel" data-html2canvas-ignore="true">
+            
+            <!-- Tools for Image Only -->
+            <div id="imageTools" class="flex items-center gap-4 border-r pr-4 border-slate-200 hidden">
+                <div class="flex flex-col">
+                    <label class="text-xs font-bold text-slate-500 mb-1"><i class="fa-solid fa-wand-magic-sparkles"></i> ลบพื้นหลังสีขาว</label>
+                    <div class="flex items-center gap-2">
+                        <input type="range" id="removeBgTolerance" min="0" max="0.5" step="0.01" value="0.1" class="w-20" oninput="applyRemoveWhiteBg()">
+                        <button onclick="toggleRemoveBg()" id="removeBgBtn" class="bg-slate-200 text-slate-700 text-xs px-2 py-1 rounded hover:bg-slate-300 font-bold transition-colors">
+                            เปิดใช้งาน
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tools for Text Only -->
+            <div id="textTools" class="flex items-center gap-3 border-r pr-4 border-slate-200 hidden">
+                <div class="flex items-center gap-2">
+                    <label class="text-xs font-bold text-slate-500">สีข้อความ:</label>
+                    <div id="textColorPicker"></div>
+                </div>
+            </div>
+
+            <!-- Common Tools -->
+            <div class="flex items-center gap-2">
+                <button onclick="centerObject()" class="tool-btn !px-3 !py-2 text-xs" title="จัดกึ่งกลาง"><i class="fa-solid fa-arrows-to-dot"></i> กึ่งกลาง</button>
+                <button onclick="cloneObject()" class="tool-btn !px-3 !py-2" title="คัดลอก"><i class="fa-solid fa-copy"></i></button>
+                <button onclick="deleteObject()" class="tool-btn danger !px-3 !py-2" title="ลบทิ้ง"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- ==================== RIGHT PANEL (REFERENCE) ==================== -->
+    <section class="right-panel">
+        <div id="refUploadBox" class="w-full h-full border-2 border-dashed border-slate-600 rounded-xl bg-slate-800/50 flex items-center justify-center relative overflow-hidden group cursor-pointer" onclick="document.getElementById('refImageInput').click()">
+            <input type="file" id="refImageInput" accept="image/*" class="hidden" onchange="loadRefImage(event)">
+            <div id="refPlaceholder" class="text-slate-400 text-center pointer-events-none transition-opacity group-hover:opacity-70">
+                <i class="fa-solid fa-cloud-arrow-up text-5xl mb-3"></i>
+                <p class="font-semibold text-lg">คลิกเพื่ออัปโหลดภาพอ้างอิง</p>
+                <p class="text-sm opacity-70">JPG, PNG</p>
+            </div>
+            <!-- ใช้ background image เพื่อให้ครอบคลุมและไม่บิดเบี้ยว -->
+            <div id="refImgDisplay" class="absolute inset-0 w-full h-full hidden z-10" style="background-size: contain; background-position: center; background-repeat: no-repeat;"></div>
+            
+            <div id="refControls" class="absolute inset-0 bg-black/60 hidden group-hover:flex flex-col items-center justify-center gap-4 z-30 transition-all opacity-0 group-hover:opacity-100">
+                <button onclick="openLightbox(event)" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-full font-bold shadow-lg">
+                    <i class="fa-solid fa-expand"></i> ขยายเต็มจอ
+                </button>
+                <p class="text-white text-sm">คลิกที่พื้นที่ว่างเพื่อเปลี่ยนรูปภาพ</p>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox" class="lightbox-modal" onclick="closeLightbox()" data-html2canvas-ignore="true">
+    <button class="absolute top-6 right-6 text-white hover:text-red-400 text-4xl z-50"><i class="fa-solid fa-xmark"></i></button>
+    <img id="lightboxImg" src="" alt="Fullscreen Reference" onclick="event.stopPropagation()">
+</div>
+
+<script>
+    let canvas;
+    const wrapper = document.getElementById('canvasWrapper');
+    let pickers = {};
+    
+    // สถานะสำหรับการเรนเดอร์แบบ Real-time (GPU Accelerated)
+    const bgState = {
+        type: 'solid',      // 'solid' or 'gradient'
+        gradStyle: 'linear',// 'linear', 'radial', 'angle', 'reflected', 'diamond'
+        solid: '#d11c1c',
+        grad1: '#ff4b1f',
+        grad2: '#ff9068',
+        angle: 135
+    };
+
+    let renderFrameId = null;
+
+    // ฟังก์ชันอัปเดตสีพื้นหลังแบบ 60fps ลื่นๆ ไร้รอยต่อ รองรับ 5 สไตล์
+    function requestBackgroundUpdate() {
+        if (renderFrameId) cancelAnimationFrame(renderFrameId);
+        
+        renderFrameId = requestAnimationFrame(() => {
+            const wrap = document.getElementById('canvasWrapper');
+            
+            if (bgState.type === 'solid') {
+                wrap.style.background = bgState.solid;
+            } else {
+                const a = bgState.angle;
+                const c1 = bgState.grad1;
+                const c2 = bgState.grad2;
+                
+                let cssBg = '';
+                switch(bgState.gradStyle) {
+                    case 'linear':
+                        cssBg = `linear-gradient(${a}deg, ${c1}, ${c2})`;
+                        break;
+                    case 'radial':
+                        // Radial มักจะไม่ใช้องศา แต่ให้จุดกำเนิดอยู่ตรงกลาง
+                        cssBg = `radial-gradient(circle, ${c1}, ${c2})`;
+                        break;
+                    case 'angle':
+                        // Conic gradient ทำงานเหมือน Angle gradient ใน Photoshop
+                        cssBg = `conic-gradient(from ${a}deg, ${c1}, ${c2}, ${c1})`;
+                        break;
+                    case 'reflected':
+                        // สะท้อนแสงโดยให้สีที่ 1 อยู่ตรงกลาง สีที่ 2 อยู่ขอบ
+                        cssBg = `linear-gradient(${a}deg, ${c2} 0%, ${c1} 45%, ${c1} 55%, ${c2} 100%)`;
+                        break;
+                    case 'diamond':
+                        // สร้างลวดลายเพชร (พุ่งแฉก) โดยใช้ conic-gradient แบบปรับค่า
+                        cssBg = `conic-gradient(from ${a}deg at 50% 50%, 
+                            ${c2} 0deg, ${c1} 45deg, ${c2} 90deg, ${c1} 135deg, 
+                            ${c2} 180deg, ${c1} 225deg, ${c2} 270deg, ${c1} 315deg, ${c2} 360deg)`;
+                        break;
+                }
+                wrap.style.background = cssBg;
+            }
+        });
+    }
+
+    // Helper สร้าง Pickr (Color Picker) สไตล์ Photoshop
+    function createPickr(selector, defaultColor, onChangeCallback) {
+        return Pickr.create({
+            el: selector,
+            theme: 'classic',
+            default: defaultColor,
+            swatches: ['#000000', '#FFFFFF', '#ef4444', '#22c55e', '#3b82f6', '#eab308', '#06b6d4', '#d946ef'],
+            components: {
+                preview: true, opacity: true, hue: true,
+                interaction: { hex: true, rgba: true, hsva: true, input: true, save: true }
+            }
+        }).on('change', (color) => {
+            onChangeCallback(color.toHEXA().toString());
+        }).on('save', (color) => {
+            onChangeCallback(color.toHEXA().toString());
+        });
+    }
+
+    window.onload = function() {
+        // สร้าง Canvas Engine
+        canvas = new fabric.Canvas('mainCanvas', {
+            preserveObjectStacking: true,
+            selection: true
+        });
+        
+        // **นวัตกรรมลดแลค:** ปล่อยให้ Fabric Canvas โปร่งใส เพื่อให้ CSS Background (GPU) ข้างหลังทำงานแทน
+        // ส่งผลให้ลากเมาส์เปลี่ยนสีได้ 100% Real-time โดยเบราว์เซอร์ไม่ค้าง
+        canvas.backgroundColor = null;
+
+        // สไตล์กรอบคอนโทรล (Move Tool) ให้ดูทันสมัย
+        fabric.Object.prototype.set({
+            transparentCorners: false,
+            cornerColor: '#3b82f6',
+            cornerStrokeColor: '#ffffff',
+            borderColor: '#3b82f6',
+            cornerSize: 10,
+            padding: 5,
+            cornerStyle: 'circle'
+        });
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // จับเหตุการณ์
+        canvas.on('selection:created', showObjectPanel);
+        canvas.on('selection:updated', showObjectPanel);
+        canvas.on('selection:cleared', hideObjectPanel);
+
+        // Init Color Pickers
+        pickers.solid = createPickr('#solidColorPicker', bgState.solid, (color) => {
+            bgState.solid = color; requestBackgroundUpdate();
+        });
+        
+        pickers.grad1 = createPickr('#gradColor1Picker', bgState.grad1, (color) => {
+            bgState.grad1 = color; requestBackgroundUpdate();
+        });
+        
+        pickers.grad2 = createPickr('#gradColor2Picker', bgState.grad2, (color) => {
+            bgState.grad2 = color; requestBackgroundUpdate();
+        });
+
+        pickers.text = createPickr('#textColorPicker', '#ffffff', (color) => {
+            const activeObj = canvas.getActiveObject();
+            if (activeObj && (activeObj.type === 'i-text' || activeObj.type === 'text')) {
+                activeObj.set('fill', color);
+                canvas.renderAll();
+            }
+        });
+
+        // Event for Angle slider
+        document.getElementById('gradAngle').addEventListener('input', function(e) {
+            bgState.angle = e.target.value;
+            document.getElementById('gradAngleText').innerText = `${bgState.angle}°`;
+            requestBackgroundUpdate();
+        });
+
+        // Initial setup
+        requestBackgroundUpdate();
+    };
+
+    function resizeCanvas() {
+        if (!canvas) return;
+        canvas.setWidth(wrapper.clientWidth);
+        canvas.setHeight(wrapper.clientHeight);
+        canvas.renderAll();
+    }
+
+    // สลับโหมดสีพื้นฐาน / ไล่สี
+    function toggleBgType(type) {
+        bgState.type = type;
+        if(type === 'solid') {
+            document.getElementById('solidBgContainer').classList.replace('hidden', 'flex');
+            document.getElementById('gradientBgContainer').classList.replace('flex', 'hidden');
+            document.getElementById('gradStyleSelector').classList.add('hidden'); // ซ่อนสไตล์
+        } else {
+            document.getElementById('solidBgContainer').classList.replace('flex', 'hidden');
+            document.getElementById('gradientBgContainer').classList.replace('hidden', 'flex');
+            document.getElementById('gradStyleSelector').classList.remove('hidden'); // แสดงสไตล์
+        }
+        requestBackgroundUpdate();
+    }
+
+    // เปลี่ยนสไตล์ของ Gradient (Linear, Radial, etc.)
+    function changeGradStyle(style) {
+        bgState.gradStyle = style;
+        requestBackgroundUpdate();
+    }
+
+    function addLogo(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(f) {
+            const data = f.target.result;
+            fabric.Image.fromURL(data, function(img) {
+                // ย่อขนาดรูปลงมาให้พอดี
+                if (img.width > canvas.width / 2) { img.scaleToWidth(canvas.width / 2); }
+                
+                img.set({
+                    left: canvas.width / 2 - (img.getScaledWidth() / 2),
+                    top: canvas.height / 2 - (img.getScaledHeight() / 2),
+                    customRemoveBgEnabled: false
+                });
+
+                canvas.add(img);
+                canvas.setActiveObject(img);
+                event.target.value = ''; // reset
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function addText() {
+        const text = new fabric.IText('คลิกเพื่อแก้ไข', {
+            left: canvas.width / 2 - 80,
+            top: canvas.height / 2,
+            fontFamily: 'Sarabun',
+            fill: '#ffffff',
+            fontSize: 40,
+            fontWeight: 'bold',
+            shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 4, offsetX: 2, offsetY: 2 })
+        });
+        canvas.add(text);
+        canvas.setActiveObject(text);
+    }
+
+    // ฟังก์ชันลบพื้นหลังสีขาว (Chroma Key)
+    function toggleRemoveBg() {
+        const activeObj = canvas.getActiveObject();
+        if (!activeObj || activeObj.type !== 'image') return;
+
+        const btn = document.getElementById('removeBgBtn');
+        activeObj.customRemoveBgEnabled = !activeObj.customRemoveBgEnabled;
+
+        if (activeObj.customRemoveBgEnabled) {
+            btn.innerText = "ปิดใช้งาน";
+            btn.classList.replace('bg-slate-200', 'bg-red-100');
+            btn.classList.replace('text-slate-700', 'text-red-600');
+            applyRemoveWhiteBg();
+        } else {
+            btn.innerText = "เปิดใช้งาน";
+            btn.classList.replace('bg-red-100', 'bg-slate-200');
+            btn.classList.replace('text-red-600', 'text-slate-700');
+            activeObj.filters = []; 
+            activeObj.applyFilters();
+            canvas.renderAll();
+        }
+    }
+
+    function applyRemoveWhiteBg() {
+        const activeObj = canvas.getActiveObject();
+        if (!activeObj || activeObj.type !== 'image' || !activeObj.customRemoveBgEnabled) return;
+        const tolerance = parseFloat(document.getElementById('removeBgTolerance').value);
+        const filter = new fabric.Image.filters.RemoveColor({ color: '#FFFFFF', distance: tolerance });
+        activeObj.filters = [filter];
+        activeObj.applyFilters();
+        canvas.renderAll();
+    }
+
+    // การจัดการ Object Panel
+    function showObjectPanel(e) {
+        const activeObj = canvas.getActiveObject();
+        if (!activeObj) return;
+
+        const panel = document.getElementById('objPanel');
+        const imgTools = document.getElementById('imageTools');
+        const txtTools = document.getElementById('textTools');
+
+        panel.classList.add('active');
+
+        if (activeObj.type === 'image') {
+            imgTools.classList.remove('hidden');
+            txtTools.classList.add('hidden');
+            
+            const btn = document.getElementById('removeBgBtn');
+            if (activeObj.customRemoveBgEnabled) {
+                btn.innerText = "ปิดใช้งาน";
+                btn.classList.replace('bg-slate-200', 'bg-red-100');
+                btn.classList.replace('text-slate-700', 'text-red-600');
+            } else {
+                btn.innerText = "เปิดใช้งาน";
+                btn.classList.replace('bg-red-100', 'bg-slate-200');
+                btn.classList.replace('text-red-600', 'text-slate-700');
+            }
+        } 
+        else if (activeObj.type === 'i-text' || activeObj.type === 'text') {
+            imgTools.classList.add('hidden');
+            txtTools.classList.remove('hidden');
+            setTimeout(() => pickers.text.setColor(activeObj.fill), 50);
+        }
+    }
+
+    function hideObjectPanel() { document.getElementById('objPanel').classList.remove('active'); }
+
+    function centerObject() {
+        const activeObj = canvas.getActiveObject();
+        if (activeObj) { activeObj.center(); activeObj.setCoords(); canvas.renderAll(); }
+    }
+
+    function deleteObject() {
+        const activeObj = canvas.getActiveObject();
+        if (activeObj) { canvas.remove(activeObj); canvas.discardActiveObject(); canvas.renderAll(); hideObjectPanel(); }
+    }
+
+    function cloneObject() {
+        const activeObj = canvas.getActiveObject();
+        if (!activeObj) return;
+        activeObj.clone(function(cloned) {
+            cloned.set({ left: activeObj.left + 20, top: activeObj.top + 20, evented: true });
+            if (cloned.type === 'image') {
+                cloned.customRemoveBgEnabled = activeObj.customRemoveBgEnabled;
+                if(activeObj.filters.length > 0) { cloned.filters = activeObj.filters.slice(); cloned.applyFilters(); }
+            }
+            canvas.add(cloned);
+            canvas.setActiveObject(cloned);
+        });
+    }
+
+    window.addEventListener('keydown', function(e) {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') { deleteObject(); }
+        }
+    });
+
+    function loadRefImage(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const display = document.getElementById('refImgDisplay');
+            display.style.backgroundImage = `url(${e.target.result})`;
+            display.classList.remove('hidden');
+            document.getElementById('refPlaceholder').classList.add('hidden');
+            document.getElementById('refControls').classList.remove('hidden');
+            document.getElementById('lightboxImg').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    function openLightbox(event) { event.stopPropagation(); document.getElementById('lightbox').classList.add('active'); }
+    function closeLightbox() { document.getElementById('lightbox').classList.remove('active'); }
+
+    function toggleExportMenu(event) {
+        event.stopPropagation();
+        document.getElementById('exportMenu').classList.toggle('show');
+    }
+
+    window.onclick = function(event) {
+        if (!event.target.closest('.relative')) {
+            const menu = document.getElementById('exportMenu');
+            if (menu && menu.classList.contains('show')) menu.classList.remove('show');
+        }
+    }
+
+    function exportImage(format) {
+        document.getElementById('exportMenu').classList.remove('show');
+        
+        // เอาเส้นกรอบ Selection สีฟ้าๆ ของ Canvas ออกก่อนแคปเจอร์ภาพ
+        canvas.discardActiveObject();
+        canvas.renderAll();
+
+        // html2canvas จะจับภาพ document.body ซึ่งจะรวมทั้ง Canvas ที่เราวางโลโก้ และสีพื้นหลัง CSS (GPU) เข้าด้วยกันอย่างสมบูรณ์
+        html2canvas(document.body, { 
+            scale: 2, 
+            useCORS: true,
+            backgroundColor: '#1a1a2e'
+        }).then(canvasOutput => {
+            if (format === 'tiff') {
+                const ctx = canvasOutput.getContext('2d');
+                const imgData = ctx.getImageData(0, 0, canvasOutput.width, canvasOutput.height);
+                const tiffFile = UTIF.encodeImage(imgData.data, canvasOutput.width, canvasOutput.height);
+                const blob = new Blob([tiffFile], {type: "image/tiff"});
+                const link = document.createElement("a");
+                link.download = "logo_mockup.tiff";
+                link.href = URL.createObjectURL(blob);
+                link.click();
+            } else {
+                const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+                const link = document.createElement('a');
+                link.download = `logo_mockup.${format}`;
+                link.href = canvasOutput.toDataURL(mimeType, 1.0);
+                link.click();
+            }
+        });
+    }
+</script>
+</body>
+</html>
