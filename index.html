@@ -104,6 +104,7 @@
 
         /* Pickr Custom Override */
         .pcr-button { border: 1px solid #cbd5e1; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .pickr { display: flex; align-items: center; gap: 0.25rem; }
     </style>
 </head>
 <body>
@@ -252,7 +253,7 @@
             <label class="block text-sm font-bold text-slate-600"><i class="fa-solid fa-fill-drip"></i> สีพื้นฐาน (Solid)</label>
             <div class="flex items-center gap-2">
                 <div id="solidColorPicker"></div>
-                <button onclick="clearBackground()" class="text-sm bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded border">ล้างสี</button>
+                <button onclick="clearBackground()" class="text-sm bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded border ml-1">ล้างสี</button>
             </div>
         </div>
 
@@ -271,7 +272,7 @@
             </div>
             <div class="flex items-center gap-2">
                 <div id="gradColor1Picker"></div>
-                <span>ถึง</span>
+                <span class="text-sm font-medium text-slate-500 mx-1">ถึง</span>
                 <div id="gradColor2Picker"></div>
             </div>
             <div class="flex items-center gap-2">
@@ -426,12 +427,12 @@
         };
     });
 
-    // Helper Function to Create Pickr
+    // Helper Function to Create Pickr (อัปเดตฟังก์ชันนี้เพื่อเพิ่มปุ่มดูดสี)
     function createPickr(selector, defaultColor, onChangeCallback, pos = 'top-middle') {
-        return Pickr.create({
+        const pickrInstance = Pickr.create({
             el: selector,
             theme: 'classic',
-            position: pos, // <-- เพิ่มคำสั่งกำหนดทิศทางการเปิดหน้าต่าง
+            position: pos, // <-- กำหนดทิศทางการเปิดหน้าต่าง
             default: defaultColor,
             swatches: ['#000000', '#FFFFFF', '#ef4444', '#22c55e', '#3b82f6', '#eab308', '#06b6d4', '#d946ef'],
             components: {
@@ -443,6 +444,42 @@
         }).on('change', (color) => {
             onChangeCallback(color.toHEXA().toString());
         });
+
+        // ใช้งาน EyeDropper API เพิ่มปุ่ม "ดูดสี" ข้างๆ Pickr 
+        pickrInstance.on('init', instance => {
+            // ตรวจสอบว่าเบราว์เซอร์รองรับ EyeDropper หรือไม่
+            if (window.EyeDropper) {
+                const pcrButton = instance.getRoot().button;
+                
+                // สร้างปุ่มดูดสี
+                const dropperBtn = document.createElement('button');
+                dropperBtn.innerHTML = '<i class="fa-solid fa-eye-dropper"></i>';
+                dropperBtn.className = 'text-slate-500 hover:text-blue-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-1 rounded shadow-sm transition-all text-xs h-[30px] w-[32px] flex items-center justify-center';
+                dropperBtn.title = 'ดูดสี (EyeDropper)';
+                
+                // เมื่อคลิกที่ปุ่มให้เปิดการดูดสีบนหน้าจอ
+                dropperBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    try {
+                        const eyeDropper = new EyeDropper();
+                        const result = await eyeDropper.open();
+                        
+                        // เซ็ตสีที่ดูดมาได้ลงใน Pickr และเรียก callback เพื่ออัปเดต UI
+                        instance.setColor(result.sRGBHex);
+                        onChangeCallback(result.sRGBHex);
+                        
+                    } catch (err) {
+                        console.log('ยกเลิกการดูดสี หรือ API มีปัญหา', err);
+                    }
+                };
+                
+                // แทรกปุ่มดูดสีต่อจากปุ่ม Pickr ต้นฉบับ
+                pcrButton.parentNode.insertBefore(dropperBtn, pcrButton.nextSibling);
+            }
+        });
+
+        return pickrInstance;
     }
 
     window.onload = () => {
@@ -450,7 +487,7 @@
         
         ['collar', 'front', 'back', 'leftSleeve', 'rightSleeve'].forEach(id => updateVisual(id));
 
-        // Initialize Pickr Instances
+        // Initialize Pickr Instances (ฟังก์ชันใหม่จะแทรกปุ่มดูดสีให้เอง)
         // 1. สีข้อความ (อยู่บนจอ) ให้เปิดลงด้านล่าง ('bottom-middle')
         pickers.globalText = createPickr('#globalTextColorPicker', '#334155', changeGlobalTextColor, 'bottom-middle');
         
@@ -528,7 +565,7 @@
     function applyGradient() {
         if(!activePartId) return;
         const deg = document.getElementById('gradAngle').value;
-        const style = document.getElementById('gradStyleSelector').value; // เพิ่มการดึงค่าสไตล์
+        const style = document.getElementById('gradStyleSelector').value; 
         document.getElementById('angleValue').innerText = `${deg}°`;
         
         const c1 = currentGrad1;
