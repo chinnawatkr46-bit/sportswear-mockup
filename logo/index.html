@@ -34,7 +34,7 @@
         .right-panel { flex: 1; background-color: #16161a; position: relative; border-left: 2px solid #2d2d3b; overflow: hidden; }
 
         /* Canvas Wrapper (ใช้ CSS เรนเดอร์พื้นหลังผ่าน GPU เพื่อลดแลค) */
-        #canvasWrapper { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; background: #d11c1c; transition: background 0.1s ease-out; }
+        #canvasWrapper { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; background: #ffffff; transition: background 0.1s ease-out; }
         
         /* Toolbar (Top) */
         .top-toolbar {
@@ -148,7 +148,15 @@
                 <button onclick="toggleExportMenu(event)" class="tool-btn primary !py-3 !px-5 shadow-lg text-lg">
                     <i class="fa-solid fa-download"></i> บันทึกภาพ
                 </button>
-                <div id="exportMenu" class="export-dropdown absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl overflow-hidden border border-slate-200 z-50">
+                <div id="exportMenu" class="export-dropdown absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl overflow-hidden border border-slate-200 z-50">
+                    <div class="px-4 py-2 bg-slate-50 border-b flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-600">อัพสเกลความคมชัด:</span>
+                        <select id="exportScale" class="text-xs border border-slate-300 rounded p-1 outline-none font-bold text-blue-600">
+                            <option value="2">ปกติ (2x)</option>
+                            <option value="4" selected>ชัดมาก (4x)</option>
+                            <option value="6">สูงสุด (6x)</option>
+                        </select>
+                    </div>
                     <button onclick="exportImage('png')" class="w-full text-left px-4 py-3 text-sm hover:bg-slate-100 font-semibold border-b"><i class="fa-regular fa-image"></i> บันทึกเป็น PNG</button>
                     <button onclick="exportImage('jpeg')" class="w-full text-left px-4 py-3 text-sm hover:bg-slate-100 font-semibold border-b"><i class="fa-solid fa-image"></i> บันทึกเป็น JPEG</button>
                     <button onclick="exportImage('tiff')" class="w-full text-left px-4 py-3 text-sm hover:bg-slate-100 font-semibold"><i class="fa-solid fa-file-image"></i> บันทึกเป็น TIFF</button>
@@ -197,7 +205,7 @@
 
     <!-- ==================== RIGHT PANEL (REFERENCE) ==================== -->
     <section class="right-panel">
-        <div id="refUploadBox" class="w-full h-full border-2 border-dashed border-slate-600 rounded-xl bg-slate-800/50 flex items-center justify-center relative overflow-hidden group cursor-pointer" onclick="document.getElementById('refImageInput').click()">
+        <div id="refUploadBox" class="w-full h-full border-2 border-solid border-black rounded-xl bg-slate-800/50 flex items-center justify-center relative overflow-hidden group cursor-pointer" onclick="document.getElementById('refImageInput').click()">
             <input type="file" id="refImageInput" accept="image/*" class="hidden" onchange="loadRefImage(event)">
             <div id="refPlaceholder" class="text-slate-400 text-center pointer-events-none transition-opacity group-hover:opacity-70">
                 <i class="fa-solid fa-cloud-arrow-up text-5xl mb-3"></i>
@@ -233,7 +241,7 @@
     const bgState = {
         type: 'solid',      // 'solid' or 'gradient'
         gradStyle: 'linear',// 'linear', 'radial', 'angle', 'reflected', 'diamond'
-        solid: '#d11c1c',
+        solid: '#ffffff',
         grad1: '#ff4b1f',
         grad2: '#ff9068',
         angle: 135
@@ -566,9 +574,11 @@
         canvas.discardActiveObject();
         canvas.renderAll();
 
+        const scaleValue = parseInt(document.getElementById('exportScale').value) || 4;
+
         // html2canvas จะจับภาพ document.body ซึ่งจะรวมทั้ง Canvas ที่เราวางโลโก้ และสีพื้นหลัง CSS (GPU) เข้าด้วยกันอย่างสมบูรณ์
         html2canvas(document.body, { 
-            scale: 2, 
+            scale: scaleValue, 
             useCORS: true,
             backgroundColor: '#1a1a2e'
         }).then(canvasOutput => {
