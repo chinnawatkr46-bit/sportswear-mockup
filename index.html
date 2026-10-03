@@ -41,7 +41,7 @@
             position: relative;
             cursor: pointer;
             overflow: hidden;
-            border: 2px dashed #cbd5e1; 
+            border: 2px solid #000000; 
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -112,7 +112,7 @@
 <div class="split-layout">
     
     <!-- ==================== LEFT PANEL (WORKSPACE) ==================== -->
-    <section class="left-panel bg-gradient-to-br from-blue-100 to-blue-300" id="leftPanel">
+    <section class="left-panel bg-white" id="leftPanel">
         
         <!-- Header -->
         <div class="mb-6 flex justify-between items-center text-slate-800">
@@ -300,8 +300,8 @@
                 <div class="flex items-center gap-2 mt-1">
                     <span class="text-xs w-12">สไตล์:</span>
                     <select id="borderStyle" onchange="applyBorder()" class="text-sm border rounded px-2 py-1 outline-none w-full">
-                        <option value="solid">เส้นทึบ (Solid)</option>
-                        <option value="dashed" selected>เส้นประ (Dashed)</option>
+                        <option value="solid" selected>เส้นทึบ (Solid)</option>
+                        <option value="dashed">เส้นประ (Dashed)</option>
                         <option value="dotted">เส้นจุด (Dotted)</option>
                         <option value="none">ไม่มีเส้น (None)</option>
                     </select>
@@ -413,7 +413,7 @@
     };
 
     const state = {
-        workspaceBg: { bgValue: 'linear-gradient(to bottom right, #dbeafe, #93c5fd)', type: 'gradient' }
+        workspaceBg: { bgValue: '#ffffff', type: 'solid' }
     };
     ['collar', 'front', 'back', 'leftSleeve', 'rightSleeve'].forEach(id => {
         state[id] = { 
@@ -422,8 +422,8 @@
             imgData: null, 
             imgFit: 'contain', 
             borderWidth: '2',
-            borderColor: '#cbd5e1',
-            borderStyle: 'dashed'
+            borderColor: '#000000',
+            borderStyle: 'solid'
         };
     });
 
@@ -507,7 +507,7 @@
             currentGrad2 = color; applyGradient();
         }, 'top-middle');
 
-        pickers.border = createPickr('#borderColorPicker', '#cbd5e1', (color) => {
+        pickers.border = createPickr('#borderColorPicker', '#000000', (color) => {
             if(!activePartId || activeType !== 'block') return;
             state[activePartId].borderColor = color;
             updateVisual(activePartId);
@@ -812,7 +812,7 @@
         activeBlocks.forEach(b => b.classList.remove('active'));
 
         html2canvas(document.body, { 
-            scale: 2, 
+            scale: 4, 
             useCORS: true,
             backgroundColor: '#1a1a2e'
         }).then(canvas => {
